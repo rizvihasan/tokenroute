@@ -56,6 +56,22 @@ notional spend) plus the raw feed. No analytics database.
 - Hosted demo ($0): Groq `openai/gpt-oss-20b` (cheap lane) and
   `openai/gpt-oss-120b` (escalation); Jina `jina-embeddings-v3` at 1024 dims
   (must match `EMBEDDING_DIM`).
+- Explicit provider routing: `/v1/chat/completions` also accepts
+  `provider:model` (`openai:gpt-4o-mini`, `anthropic:claude-sonnet-4-5`,
+  `gemini:gemini-2.5-flash`, `groq:...`). All presets speak the
+  OpenAI-compatible API, so one client path serves every provider. Key
+  resolution order: tenant BYOK key (Fernet-decrypted) -> platform env key
+  (`OPENAI_API_KEY` etc.). Explicit targets never fall back across providers.
+
+## Tenancy (hosted mode)
+
+With `TENANCY_ENABLED=true`, `/v1` and `/chat` require
+`Authorization: Bearer tr_...`. Tenant API keys are sha256-hashed at rest,
+BYOK provider keys are Fernet-encrypted (`BYOK_MASTER_KEY`), and each key can
+carry a monthly USD cap enforced as a hard 402. `/admin/*` (shared-secret
+`ADMIN_KEY`) is the provisioning API the web app calls server-side after
+Google sign-in - browsers never see it. Off by default: local dev and
+self-hosting stay keyless.
 
 ## Scaling story
 

@@ -53,7 +53,11 @@ retention, SSO) is the paid layer. The free tier is the product, not the funnel.
 
 ## Roadmap
 
-1. Multi-tenancy: per-user API keys, per-key budgets and rate limits (BYOK)
-2. Provider breadth: first-class Anthropic, Gemini, Bedrock configs
-3. Learned lane router (today: inspectable heuristic)
-4. Hosted control plane beta
+Shipped: multi-tenancy (per-user API keys hashed at rest, per-key monthly
+budget hard caps, BYOK provider keys Fernet-encrypted), self-serve signup
+(Google sign-in, key dashboard), provider breadth (Groq, OpenAI, Anthropic,
+Gemini via `provider:model`).
+
+1. Learned lane router (today: inspectable heuristic)
+2. Hosted control plane beta (team management, SSO)
+3. Billing for the hosted plane

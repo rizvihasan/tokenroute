@@ -93,6 +93,13 @@ Design decisions and data flow: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 https://tokenroute.vercel.app - console at [/console](https://tokenroute.vercel.app/console).
 Runs on free tiers (Vercel + Render + Upstash + Neon + Groq + Jina); services sleep after 15 min idle, so the first message can take ~30-60s. The hosted demo swaps local Ollama for Groq's gpt-oss models (no free tier runs an 8B quantized model); the routing/cache/metrics story is identical.
 
+Want your own key on the hosted gateway? Sign in with Google at
+[/login](https://tokenroute.vercel.app/login) and create one on the dashboard
+(optional monthly budget cap; you can also plug in your own OpenAI/Anthropic/
+Gemini/Groq key and your usage bills to your provider, not the platform).
+Then point any OpenAI SDK at `https://tokenroute-gateway.onrender.com/v1`
+with the key as the Bearer token.
+
 ## Repo layout
 
 ```
