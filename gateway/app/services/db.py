@@ -10,7 +10,6 @@ from pgvector.psycopg import register_vector_async
 from ..config import get_settings
 
 DDL = f"""
-CREATE EXTENSION IF NOT EXISTS vector;
 CREATE TABLE IF NOT EXISTS chunks (
     id BIGSERIAL PRIMARY KEY,
     doc_id TEXT NOT NULL,
@@ -28,6 +27,8 @@ CREATE INDEX IF NOT EXISTS chunks_embedding_idx
 
 async def get_conn() -> psycopg.AsyncConnection:
     conn = await psycopg.AsyncConnection.connect(get_settings().database_url)
+    # extension must exist before the vector type can be registered
+    await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
     await register_vector_async(conn)
     return conn
 
@@ -60,9 +61,9 @@ async def search(query_embedding: list[float], top_k: int) -> list[dict]:
     async with await get_conn() as conn:
         cur = await conn.execute(
             """
-            SELECT doc_id, content, metadata, 1 - (embedding <=> %s) AS score
+            SELECT doc_id, content, metadata, 1 - (embedding <=> %s::vector) AS score
             FROM chunks
-            ORDER BY embedding <=> %s
+            ORDER BY embedding <=> %s::vector
             LIMIT %s
             """,
             (query_embedding, query_embedding, top_k),
