@@ -136,11 +136,11 @@ async def resolve(raw_key: str) -> TenantContext | None:
             (key[1],),
         )
         provider_rows = await rows.fetchall()
-    f = _fernet()
+    f = _fernet() if provider_rows else None
     return TenantContext(
         tenant_id=key[1], key_id=key[0],
         monthly_cap_usd=float(key[2]) if key[2] is not None else None,
-        provider_keys={p: f.decrypt(ct.encode()).decode() for p, ct in provider_rows},
+        provider_keys={p: f.decrypt(ct.encode()).decode() for p, ct in provider_rows} if f else {},
     )
 
 
