@@ -60,6 +60,12 @@ client.chat.completions.create(model="chat-local",   # or "chat-cloud", or "prov
 | RAG | Chunker, embeddings, pgvector retrieval, context-grounded prompting (`POST /ingest` your docs) |
 | Evals | Ragas runner over a golden set, one click from the console |
 | Metrics | Per-request cost, TTFT, tokens/sec, lane - counters in Redis, derived at read time |
+| Function calling | `tools`/`tool_choice` pass-through with streamed `tool_calls`; tool-result messages supported |
+| Guardrails | High-precision injection filter + Luhn-checked card redaction; `GUARDRAILS_MODE=off/log/block`, triggers logged to the console |
+| RBAC | Scoped keys (`chat`, `metrics`); `/v1/usage` reports a key's spend vs cap |
+| Advanced RAG | Hybrid vector + keyword retrieval (RRF) with Jina rerank; degrades gracefully per leg |
+| MCP server | `POST /mcp` JSON-RPC: `tokenroute_chat`, `tokenroute_usage` - Claude/Cursor call the gateway as a tool |
+| Billing (structure) | Free/Pro plans, subscriptions, Razorpay-first checkout + signed webhooks (Stripe alt); dormant until credentials are set |
 
 ## Architecture
 
@@ -122,10 +128,14 @@ cd web && npm install && npm run typecheck && npm run build
 
 ## Roadmap
 
-- Multi-tenancy: per-user API keys, per-key budgets and rate limits
-- Provider breadth: first-class Anthropic, Gemini, Bedrock configs
+Shipped: multi-tenancy (keys, budgets, RBAC scopes, BYOK), Google sign-up +
+key dashboard, 4-provider routing, function calling, guardrails, hybrid RAG
++ rerank, MCP server, billing structure (plug in Razorpay/Stripe to activate).
+
 - Learned lane router (replacing the heuristic)
+- Bedrock/OpenRouter presets
 - Streaming usage metering for WebSocket/agent workloads
+- Billing go-live (needs a provider account - structure is ready)
 
 ## Honest limitations
 

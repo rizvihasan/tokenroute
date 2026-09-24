@@ -63,6 +63,18 @@ notional spend) plus the raw feed. No analytics database.
   resolution order: tenant BYOK key (Fernet-decrypted) -> platform env key
   (`OPENAI_API_KEY` etc.). Explicit targets never fall back across providers.
 
+## Guardrails, MCP, billing
+
+- Guardrails run in the request path (`GUARDRAILS_MODE=off/log/block`): a
+  high-precision injection filter on input, Luhn-checked card redaction on
+  completed outputs; triggers are metered into the console.
+- The MCP server (`POST /mcp`) is a dependency-free JSON-RPC implementation
+  exposing the gateway as tools for agent clients; same tenancy keys as /v1.
+- Billing is structure-complete and dormant: plans + subscriptions table +
+  signed webhook handlers (Razorpay first, Stripe alt). Checkout returns 501
+  until `BILLING_PROVIDER` + credentials are configured; plan activation
+  syncs the tenant's key caps.
+
 ## Tenancy (hosted mode)
 
 With `TENANCY_ENABLED=true`, `/v1` and `/chat` require
