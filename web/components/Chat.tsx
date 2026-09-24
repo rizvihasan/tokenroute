@@ -149,16 +149,19 @@ export function Chat() {
           {meta?.contexts && meta.contexts.length > 0 && (
             <Badge variant="accent">rag: {meta.contexts.map((c) => c.doc_id).join(", ")}</Badge>
           )}
-          {stats && (
-            <Badge variant="outline">
-              <span className="font-sans normal-case tracking-normal">
-                {stats.ttft_ms != null ? `ttft ${Math.round(stats.ttft_ms)}ms - ` : ""}
-                {stats.tokens_out} tok
-                {stats.tokens_per_sec ? ` - ${Math.round(stats.tokens_per_sec)} tok/s` : ""}
-                {` - $${stats.cost_usd.toFixed(6)}`}
-              </span>
-            </Badge>
-          )}
+          {stats &&
+            (meta?.lane === "cache" || stats.tokens_out === 0 ? (
+              <Badge variant="info">served from cache - $0</Badge>
+            ) : (
+              <Badge variant="outline">
+                <span className="font-sans normal-case tracking-normal">
+                  {stats.ttft_ms != null ? `ttft ${Math.round(stats.ttft_ms)}ms - ` : ""}
+                  {stats.tokens_out} tok
+                  {stats.tokens_per_sec ? ` - ${Math.round(stats.tokens_per_sec)} tok/s` : ""}
+                  {` - $${stats.cost_usd.toFixed(6)}`}
+                </span>
+              </Badge>
+            ))}
         </div>
       )}
 
