@@ -30,6 +30,13 @@ general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
   max_budget: 5.0
   budget_duration: 30d
+  # 512MB free-tier container: no database attached, so the spend/error log
+  # writers and the budget-reset job are pure memory overhead. Disable them.
+  disable_spend_logs: true
+  disable_error_logs: true
+  disable_reset_budget: true
 
 litellm_settings:
   drop_params: true
+  cache: false
+  turn_off_message_logging: true
