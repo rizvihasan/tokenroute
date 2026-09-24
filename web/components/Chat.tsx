@@ -92,7 +92,7 @@ export function Chat() {
   const empty = messages.length === 0;
 
   return (
-    <div className="flex h-[calc(100dvh-3.5rem)] flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain py-6">
         {empty ? (
           <div className="flex h-full flex-col items-center justify-center gap-6 animate-fade-up px-2">

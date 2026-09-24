@@ -29,7 +29,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en" className={`${inter.variable} ${jetbrains.variable}`}>
       <body className="flex min-h-dvh flex-col">
         <SiteHeader userEmail={session?.user?.email ?? null} signOutAction={signOutAction} />
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 sm:px-6">{children}</main>
+        <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 sm:px-6">{children}</main>
         <footer className="mt-auto border-t border-edge/60">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-5 text-xs text-faint sm:px-6">
             <span>TokenRoute - open source, Apache 2.0</span>
