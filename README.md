@@ -126,7 +126,10 @@ so the first message can take ~30-60s.
 
 The compose stack is the real thing; a hosted demo is wired for free tiers:
 
-- **web** -> Vercel (root dir `web/`, one env var: `GATEWAY_INTERNAL_URL`)
+- **web** -> Vercel (root dir `web/`, one env var: `GATEWAY_INTERNAL_URL`);
+  includes the analytics console at `/console` (lane distribution, cache hit
+  rate, TTFT percentiles, live request feed - all derived from the gateway's
+  request log in Redis)
 - **gateway** -> Render free web service (Docker, `RUN_WORKER=1` runs the RQ
   worker in-process; free tiers have no background workers)
 - **litellm** -> Render free web service (Docker, `litellm/Dockerfile` +
