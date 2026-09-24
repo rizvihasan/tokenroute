@@ -19,7 +19,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from ..config import get_settings
 from ..models import ChatMessage, ChatRequest
-from ..services import cache, db, llm, routing, store, tenancy
+from ..services import cache, db, guardrails, llm, routing, store, tenancy
 
 router = APIRouter()
 
@@ -145,7 +145,24 @@ async def chat_completions(payload: dict, request: Request):
         # a cached text answer is never a valid reply to a tool call
         use_cache=not tools,
     )
-    prompt = next((m.content for m in reversed(req.messages) if m.role == "user"), "")
+    prompt = next((m.content for m in reversed(req.messages) if m.role == "user"), "") or ""
+
+    gmode = guardrails.mode()
+    if gmode != "off" and prompt:
+        hit = guardrails.check_input(prompt)
+        if hit is not None:
+            await store.log_request({
+                "ts": time.time(), "conversation_id": req.conversation_id,
+                "prompt": prompt[:120], "lane": "guardrail", "model": model_req,
+                "cached": False, "status": f"guardrail_{gmode}:{hit.rule}",
+                "ttft_ms": None, "elapsed_s": 0.0,
+                "tokens_in": 0, "tokens_out": 0, "tokens_per_sec": 0.0, "cost_usd": 0.0,
+            })
+            if gmode == "block":
+                return JSONResponse(status_code=400, content={"error": {
+                    "message": f"request rejected by input guardrail ({hit.rule})",
+                    "type": "guardrail_block"}})
+
     messages, lane, model_alias, cached = await _run_pipeline(req)
     if explicit_model is not None:
         model_alias = explicit_model
@@ -255,6 +272,8 @@ async def chat_completions(payload: dict, request: Request):
             continue
         collected.append(event["token"])
     text = "".join(collected)
+    if text and guardrails.mode() != "off":
+        text, _rules = guardrails.redact_output(text)
     if text and not tools:
         try:
             await cache.save(prompt, text, model_alias)

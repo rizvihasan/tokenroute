@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     admin_key: str = ""  # protects /admin provisioning endpoints
     byok_master_key: str = ""  # Fernet key encrypting tenant provider keys
 
+    # guardrails: off (self-host default) | log | block
+    guardrails_mode: str = "off"
+
     redis_url: str = "redis://localhost:6379/0"
     database_url: str = "postgresql://postgres:postgres@localhost:5432/tokenroute"
 
