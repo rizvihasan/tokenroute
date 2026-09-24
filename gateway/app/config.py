@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql://postgres:postgres@localhost:5432/tokenroute"
 
     cache_threshold: float = 0.92
+    embedding_dim: int = 768
     cache_max_entries: int = 1000
     rate_limit_per_minute: int = 30
 

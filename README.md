@@ -118,6 +118,27 @@ cd gateway && pip install -r requirements.txt && python -m pytest tests -q
 cd web && npm install && npm run typecheck && npm run build
 ```
 
+## Deploying the demo ($0)
+
+The compose stack is the real thing; a hosted demo is wired for free tiers:
+
+- **web** -> Vercel (root dir `web/`, one env var: `GATEWAY_INTERNAL_URL`)
+- **gateway** -> Render free web service (Docker, `RUN_WORKER=1` runs the RQ
+  worker in-process; free tiers have no background workers)
+- **litellm** -> Render free web service (Docker, `litellm/Dockerfile` +
+  `config.deploy.yaml`)
+- **Redis** -> Upstash free; **Postgres** -> Neon free (pgvector built in)
+- **models** -> Groq (OpenAI-compatible) serves both lanes: `llama-3.1-8b-instant`
+  as the cheap lane and `llama-3.3-70b-versatile` as the escalation lane.
+  Embeddings via Jina v3 (OpenAI-compatible). Set `EMBEDDING_DIM=1024`.
+- `render.yaml` is the blueprint; CI runs in GitHub Actions (`.github/workflows/ci.yml`).
+
+Honest tradeoff: no free tier runs a quantized 8B model, so the deployed demo
+swaps local Ollama for Groq's hosted Llama - the routing, fallback, caching,
+and metrics story is identical, and the local-quantized path stays one
+`docker compose up` away. Free Render services sleep after 15 min idle; the
+first request after idle cold-starts (~30-60s).
+
 ## Honest limitations
 
 - Semantic cache lookup is a linear scan (documented above).

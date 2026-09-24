@@ -9,15 +9,15 @@ from pgvector.psycopg import register_vector_async
 
 from ..config import get_settings
 
-DDL = """
+DDL = f"""
 CREATE EXTENSION IF NOT EXISTS vector;
 CREATE TABLE IF NOT EXISTS chunks (
     id BIGSERIAL PRIMARY KEY,
     doc_id TEXT NOT NULL,
     chunk_index INT NOT NULL,
     content TEXT NOT NULL,
-    metadata JSONB NOT NULL DEFAULT '{}',
-    embedding vector(768),
+    metadata JSONB NOT NULL DEFAULT '{{}}',
+    embedding vector({get_settings().embedding_dim}),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (doc_id, chunk_index)
 );
