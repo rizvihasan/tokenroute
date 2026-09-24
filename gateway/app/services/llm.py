@@ -17,6 +17,28 @@ import httpx
 
 from ..config import get_settings
 
+# OpenAI-compatible provider presets for explicit "provider:model" requests.
+# Groq is the platform default (lanes); the rest light up when the matching
+# *_API_KEY env is set, or when a tenant supplies one via BYOK.
+PROVIDERS: dict[str, tuple[str, str]] = {
+    "groq": ("https://api.groq.com/openai/v1", "groq_api_key"),
+    "openai": ("https://api.openai.com/v1", "openai_api_key"),
+    "anthropic": ("https://api.anthropic.com/v1", "anthropic_api_key"),
+    "gemini": ("https://generativelanguage.googleapis.com/v1beta/openai", "gemini_api_key"),
+}
+
+
+def provider_target(target: str, keys: dict | None = None) -> tuple[str, str, str] | None:
+    """Resolve an explicit "provider:model" request to (base_url, api_key,
+    model). Returns None when target is a lane alias, not a provider target.
+    A tenant BYOK key for the provider wins over the platform env key."""
+    provider, sep, model = target.partition(":")
+    if not sep or provider not in PROVIDERS or not model:
+        return None
+    base, key_attr = PROVIDERS[provider]
+    key = (keys or {}).get(provider) or getattr(get_settings(), key_attr)
+    return (base, key, model)
+
 
 def _chat_provider(alias: str, keys: dict | None = None) -> tuple[str, str, str]:
     """Resolve a lane alias to (base_url, api_key, provider model).
@@ -25,6 +47,9 @@ def _chat_provider(alias: str, keys: dict | None = None) -> tuple[str, str, str]
     key for the configured chat provider wins over the platform's env key -
     that is the BYOK path; without one, the platform key serves the request.
     """
+    explicit = provider_target(alias, keys)
+    if explicit is not None:
+        return explicit
     s = get_settings()
     tenant_key = (keys or {}).get(s.chat_provider)
     if alias == s.lane_cloud_alias:
@@ -111,7 +136,9 @@ async def stream_chat(messages: list[dict], model_alias: str, keys: dict | None 
     """
     s = get_settings()
     aliases = [model_alias]
-    if model_alias == s.lane_local_alias:
+    if provider_target(model_alias) is not None:
+        pass  # explicit provider target: no cross-lane fallback
+    elif model_alias == s.lane_local_alias:
         aliases.append(s.lane_cloud_alias)
     elif model_alias == s.lane_cloud_alias:
         aliases.append(s.lane_local_alias)

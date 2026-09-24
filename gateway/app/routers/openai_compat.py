@@ -111,6 +111,8 @@ async def chat_completions(payload: dict, request: Request):
         force = "local"
     elif model_req == settings.lane_cloud_alias:
         force = "cloud"
+    # explicit provider routing: "openai:gpt-4o-mini", "anthropic:claude-...", ...
+    explicit_model = model_req if llm.provider_target(model_req) is not None else None
 
     ctx, err = await _authenticate(request)
     if err is not None:
@@ -129,6 +131,8 @@ async def chat_completions(payload: dict, request: Request):
     )
     prompt = next((m.content for m in reversed(req.messages) if m.role == "user"), "")
     messages, lane, model_alias, cached = await _run_pipeline(req)
+    if explicit_model is not None:
+        model_alias = explicit_model
     cid = f"chatcmpl-{uuid.uuid4().hex[:24]}"
 
     async def gen_sse():

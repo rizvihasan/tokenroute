@@ -42,7 +42,9 @@ Any OpenAI-compatible client works:
 ```python
 from openai import OpenAI
 client = OpenAI(base_url="http://localhost:8000/v1", api_key="not-needed")
-client.chat.completions.create(model="chat-local",   # or "chat-cloud" to force the strong lane
+client.chat.completions.create(model="chat-local",   # or "chat-cloud", or "provider:model"
+                               # e.g. "openai:gpt-4o-mini", "anthropic:claude-sonnet-4-5",
+                               # "gemini:gemini-2.5-flash" (platform env key or tenant BYOK)
                                messages=[{"role": "user", "content": "Explain p95 latency"}])
 ```
 

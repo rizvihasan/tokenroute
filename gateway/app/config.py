@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     embed_provider: str = "jina"
     groq_api_key: str = ""
     jina_api_key: str = ""
+    # optional extra chat providers (explicit "provider:model" requests)
+    openai_api_key: str = ""
+    anthropic_api_key: str = ""
+    gemini_api_key: str = ""
 
     # multi-tenancy (open core): off for local dev / the public demo,
     # on for a hosted deployment
