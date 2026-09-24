@@ -91,7 +91,8 @@ export function Chat() {
   return (
     <div className="flex flex-1 flex-col">
       {empty ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-8 px-2 py-10">
+        <div className="flex flex-1 flex-col items-center px-2 py-10">
+          <div className="my-auto flex w-full flex-col items-center gap-8">
           <div className="flex max-w-2xl flex-col items-center gap-5 text-center">
             <LogoMark className="h-10 w-10" />
             <h1 className="text-2xl font-semibold tracking-tight text-slate-100 sm:text-4xl">
@@ -135,6 +136,7 @@ export function Chat() {
               Ask one, then rephrase it and ask again - the second answer comes back
               from the semantic cache, free.
             </p>
+          </div>
           </div>
         </div>
       ) : (
