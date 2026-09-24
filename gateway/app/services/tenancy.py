@@ -158,7 +158,7 @@ async def budget_exceeded(ctx: TenantContext) -> bool:
 async def list_api_keys(tenant_id: str) -> list[dict]:
     async with await db.get_conn() as conn:
         rows = await conn.execute(
-            "SELECT id, prefix, name, created_at, monthly_cap_usd FROM api_keys "
+            "SELECT id, key_prefix AS prefix, name, created_at, monthly_cap_usd FROM api_keys "
             "WHERE tenant_id = %s AND revoked_at IS NULL ORDER BY created_at DESC",
             (tenant_id,),
         )
