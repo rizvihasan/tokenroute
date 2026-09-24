@@ -4,7 +4,8 @@ from fastapi import FastAPI
 
 from .config import get_settings
 
-from .routers import admin, chat, evals, ingest, mcp, metrics, openai_compat
+from .routers import admin, billing, chat, evals, ingest, mcp, metrics, openai_compat
+from .services import billing as billing_svc
 from .services import db, tenancy
 
 
@@ -14,6 +15,7 @@ async def lifespan(app: FastAPI):
         await db.init_schema()
         if get_settings().tenancy_enabled:
             await tenancy.init_schema()
+            await billing_svc.init_schema()
     except Exception:
         # the API still serves chat without RAG; retrieval degrades gracefully
         pass
@@ -28,6 +30,7 @@ app.include_router(evals.router)
 app.include_router(metrics.router)
 app.include_router(admin.router)
 app.include_router(mcp.router)
+app.include_router(billing.router)
 
 
 @app.get("/healthz")

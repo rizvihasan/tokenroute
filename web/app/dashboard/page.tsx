@@ -1,19 +1,20 @@
 import { auth, signOut } from "@/auth";
 import { redirect } from "next/navigation";
-import { ensureTenant, listKeys, createKey, revokeKey, setProviderKey } from "@/lib/provision";
+import { ensureTenant, listKeys, createKey, revokeKey, setProviderKey, getBilling, createCheckout } from "@/lib/provision";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: { newkey?: string; newprefix?: string; error?: string };
+  searchParams: { newkey?: string; newprefix?: string; error?: string; billing?: string };
 }) {
   const session = await auth();
   if (!session?.user?.email) redirect("/login");
 
   const tenant = await ensureTenant(session.user.email, session.user.name);
   const keys = await listKeys(tenant.id);
+  const billing = await getBilling(tenant.id);
 
   async function createKeyAction(formData: FormData) {
     "use server";
@@ -23,7 +24,9 @@ export default async function DashboardPage({
     const name = String(formData.get("name") || "default").slice(0, 128);
     const capRaw = String(formData.get("cap") || "").trim();
     const cap = capRaw ? Number(capRaw) : null;
-    const created = await createKey(tenant.id, name, cap && cap > 0 ? cap : null);
+    const scopes = formData.getAll("scopes").map(String).filter((v) => ["chat", "metrics"].includes(v));
+    const created = await createKey(tenant.id, name, cap && cap > 0 ? cap : null,
+                                    scopes.length ? scopes : undefined);
     redirect(`/dashboard?newkey=${encodeURIComponent(created.key)}&newprefix=${encodeURIComponent(created.prefix)}`);
   }
 
@@ -44,6 +47,17 @@ export default async function DashboardPage({
     const apiKey = String(formData.get("api_key") || "").trim();
     if (apiKey.length >= 8) await setProviderKey(tenant.id, provider, apiKey);
     redirect("/dashboard");
+  }
+
+  async function upgradeAction() {
+    "use server";
+    const session = await auth();
+    if (!session?.user?.email) redirect("/login");
+    const tenant = await ensureTenant(session.user.email);
+    const result = await createCheckout(tenant.id, session.user.email);
+    if ("not_configured" in result) redirect("/dashboard?billing=unconfigured");
+    else if (result.checkout_url) redirect(result.checkout_url);
+    else redirect("/dashboard?billing=error");
   }
 
   async function signOutAction() {
@@ -78,7 +92,7 @@ export default async function DashboardPage({
           <thead>
             <tr className="text-left text-muted border-b border-edge">
               <th className="p-3">Name</th><th className="p-3">Key</th>
-              <th className="p-3">Monthly cap</th><th className="p-3">Created</th><th className="p-3" />
+              <th className="p-3">Monthly cap</th><th className="p-3">Scopes</th><th className="p-3">Created</th><th className="p-3" />
             </tr>
           </thead>
           <tbody>
@@ -87,6 +101,7 @@ export default async function DashboardPage({
                 <td className="p-3">{k.name}</td>
                 <td className="p-3 font-mono text-muted">{k.prefix}...</td>
                 <td className="p-3">{k.monthly_cap_usd != null ? `$${k.monthly_cap_usd}` : "none"}</td>
+                <td className="p-3 text-muted">{(k.scopes ?? ["chat"]).join(", ")}</td>
                 <td className="p-3 text-muted">{new Date(k.created_at).toLocaleDateString()}</td>
                 <td className="p-3 text-right">
                   <form action={revokeKeyAction}>
@@ -97,10 +112,27 @@ export default async function DashboardPage({
               </tr>
             ))}
             {keys.length === 0 && (
-              <tr><td colSpan={5} className="p-3 text-muted">No keys yet - create one below.</td></tr>
+              <tr><td colSpan={6} className="p-3 text-muted">No keys yet - create one below.</td></tr>
             )}
           </tbody>
         </table>
+      </section>
+
+      <section className="rounded-lg border border-edge bg-panel p-4">
+        <h2 className="font-medium mb-2">Billing</h2>
+        <p className="text-sm text-muted mb-3">
+          Current plan: <span className="text-slate-200 font-medium">{billing.plan}</span>
+          {billing.status !== "active" ? ` (${billing.status})` : ""} - free tier includes a
+          $5/mo platform cap. Pro raises it to $50/mo.
+        </p>
+        {searchParams.billing === "unconfigured" && (
+          <p className="text-sm text-amber-400 mb-2">Payments are not switched on yet - checkout opens when the provider account is connected.</p>
+        )}
+        {billing.plan === "free" && (
+          <form action={upgradeAction}>
+            <button className="rounded-lg border border-accent px-4 py-1.5 text-sm font-medium text-accent hover:bg-accent/10">Upgrade to Pro</button>
+          </form>
+        )}
       </section>
 
       <section className="rounded-lg border border-edge bg-panel p-4">
@@ -114,6 +146,15 @@ export default async function DashboardPage({
             <span className="text-muted">Monthly budget cap (USD, optional)</span>
             <input name="cap" placeholder="5.00" className="rounded bg-canvas border border-edge px-3 py-1.5 text-sm w-36" />
           </label>
+          <fieldset className="text-sm flex flex-col gap-1">
+            <span className="text-muted">Scopes</span>
+            <label className="flex items-center gap-2 text-muted">
+              <input type="checkbox" name="scopes" value="chat" defaultChecked /> chat
+            </label>
+            <label className="flex items-center gap-2 text-muted">
+              <input type="checkbox" name="scopes" value="metrics" /> metrics (read usage)
+            </label>
+          </fieldset>
           <button className="rounded-lg bg-accent px-4 py-1.5 text-sm font-medium text-white">Create key</button>
         </form>
       </section>

@@ -20,6 +20,14 @@ export interface TenantKey {
   name: string;
   created_at: string;
   monthly_cap_usd: number | null;
+  scopes?: string[];
+}
+
+export interface BillingStatus {
+  plan: string;
+  status: string;
+  provider: string;
+  current_period_end: string | null;
 }
 
 export async function ensureTenant(email: string, name?: string | null) {
@@ -34,11 +42,28 @@ export async function listKeys(tenantId: string): Promise<TenantKey[]> {
 }
 
 // The raw key comes back here and is shown to the user exactly once.
-export async function createKey(tenantId: string, name: string, monthlyCapUsd: number | null) {
+export async function createKey(tenantId: string, name: string, monthlyCapUsd: number | null,
+                                scopes?: string[]) {
   return (await admin("/admin/keys", {
     method: "POST",
-    body: JSON.stringify({ tenant_id: tenantId, name, monthly_cap_usd: monthlyCapUsd }),
+    body: JSON.stringify({ tenant_id: tenantId, name, monthly_cap_usd: monthlyCapUsd, scopes }),
   })) as { id: string; key: string; prefix: string; name: string };
+}
+
+export async function getBilling(tenantId: string): Promise<BillingStatus> {
+  return (await admin(`/billing/status?tenant_id=${encodeURIComponent(tenantId)}`)) as BillingStatus;
+}
+
+export async function createCheckout(tenantId: string, email: string) {
+  const resp = await fetch(`${GW}/billing/checkout`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-admin-key": ADMIN },
+    body: JSON.stringify({ tenant_id: tenantId, email, plan: "pro" }),
+    cache: "no-store",
+  });
+  if (resp.status === 501) return { not_configured: true as const };
+  if (!resp.ok) throw new Error(`billing checkout: ${resp.status}`);
+  return (await resp.json()) as { provider: string; checkout_url: string };
 }
 
 export async function revokeKey(keyId: string) {

@@ -49,6 +49,17 @@ class Settings(BaseSettings):
     # guardrails: off (self-host default) | log | block
     guardrails_mode: str = "off"
 
+    # billing (hosted control plane). Empty provider = billing disabled;
+    # checkout returns 501 until real credentials are plugged in.
+    billing_provider: str = ""  # "" | "razorpay" | "stripe"
+    razorpay_key_id: str = ""
+    razorpay_key_secret: str = ""
+    razorpay_webhook_secret: str = ""
+    razorpay_plan_id_pro: str = ""  # created once in the Razorpay dashboard
+    stripe_api_key: str = ""
+    stripe_webhook_secret: str = ""
+    stripe_price_id_pro: str = ""
+
     redis_url: str = "redis://localhost:6379/0"
     database_url: str = "postgresql://postgres:postgres@localhost:5432/tokenroute"
 
