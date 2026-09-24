@@ -13,7 +13,7 @@ const config: Config = {
         accent: "#5eead4",
         "accent-strong": "#2dd4bf",
         muted: "#8b94a7",
-        faint: "#5b6474",
+        faint: "#6f7889",
       },
       fontFamily: {
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],

@@ -9,9 +9,9 @@ import { LogoMark } from "./Logo";
 
 const SUGGESTIONS = [
   "Explain semantic caching in one paragraph",
-  "What is the difference between RAG and fine-tuning?",
+  "Is RAG better than fine-tuning?",
   "Write a haiku about load balancers",
-  "Explain KV cache in transformers simply",
+  "Explain KV caching in transformers simply",
 ];
 
 export function Chat() {
@@ -101,14 +101,16 @@ export function Chat() {
                 <LogoMark className="h-10 w-10" />
               </div>
               <div>
-                <h1 className="text-2xl font-semibold tracking-tight text-slate-100 sm:text-3xl">
-                  One gateway. Every model.{" "}
-                  <span className="text-accent">Measured cost.</span>
+                <h1 className="text-2xl font-semibold tracking-tight text-slate-100 sm:text-4xl">
+                  Easy prompts don't deserve{" "}
+                  <span className="text-accent">premium prices.</span>
                 </h1>
-                <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-muted">
-                  Answers route between a local lane and a cloud fallback behind a semantic
-                  cache. Ask the same thing twice - paraphrased counts - and watch the
-                  second answer come back from cache for $0.
+                <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-muted sm:text-[15px]">
+                  TokenRoute is one OpenAI-compatible endpoint that reads every request,
+                  sends the easy ones down the cheap lane and the hard ones to the heavy
+                  hitters - then answers repeat questions from a semantic cache for $0.
+                  Every call reports its lane, latency, and cost. Ask something, then ask
+                  it again in different words.
                 </p>
               </div>
             </div>
@@ -125,9 +127,9 @@ export function Chat() {
             </div>
             <div className="flex flex-wrap items-center justify-center gap-2">
               <Badge variant="accent">semantic cache</Badge>
-              <Badge variant="muted">smart routing</Badge>
-              <Badge variant="muted">rag</Badge>
-              <Badge variant="muted">live metrics</Badge>
+              <Badge variant="muted">cost-aware routing</Badge>
+              <Badge variant="muted">rag built in</Badge>
+              <Badge variant="muted">live cost per call</Badge>
             </div>
           </div>
         ) : (
@@ -168,7 +170,7 @@ export function Chat() {
       <div className="pb-4 pt-1">
         <Composer onSend={send} disabled={streaming} />
         <p className="mt-2 text-center text-[11px] text-faint">
-          Demo tenant with a $5/mo cap - Enter to send, Shift+Enter for a newline
+          Free demo on a $5/month cap - Enter to send, Shift+Enter for a newline
         </p>
       </div>
     </div>

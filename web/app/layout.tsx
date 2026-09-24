@@ -9,7 +9,7 @@ const jetbrains = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono", 
 
 export const metadata: Metadata = {
   title: "TokenRoute",
-  description: "LLM inference gateway with semantic caching, RAG, and live ops metrics",
+  description: "The LLM gateway that sends easy prompts to cheap models, answers repeats from a semantic cache, and shows you the cost of every single call.",
 };
 
 export const viewport: Viewport = {
@@ -28,11 +28,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en" className={`${inter.variable} ${jetbrains.variable}`}>
       <body className="flex min-h-dvh flex-col">
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-accent focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-ink"
+        >
+          Skip to content
+        </a>
         <SiteHeader userEmail={session?.user?.email ?? null} signOutAction={signOutAction} />
-        <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 sm:px-6">{children}</main>
+        <main id="main" className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 sm:px-6">{children}</main>
         <footer className="mt-auto border-t border-edge/60">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-5 text-xs text-faint sm:px-6">
-            <span>TokenRoute - open source, Apache 2.0</span>
+            <span>TokenRoute - open source under Apache 2.0</span>
             <div className="flex items-center gap-4">
               <a href="https://github.com/rizvihasan/tokenroute" target="_blank" rel="noreferrer" className="transition-colors hover:text-slate-300">
                 GitHub

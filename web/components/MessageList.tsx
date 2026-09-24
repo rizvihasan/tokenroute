@@ -8,7 +8,7 @@ export interface Message {
 
 export function MessageList({ messages, streaming }: { messages: Message[]; streaming: boolean }) {
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-4 pb-2">
+    <div className="mx-auto flex max-w-3xl flex-col gap-4 pb-2" role="log" aria-live="polite" aria-label="Conversation">
       {messages.map((m, i) => {
         const isUser = m.role === "user";
         const isLast = i === messages.length - 1;
@@ -33,7 +33,7 @@ export function MessageList({ messages, streaming }: { messages: Message[]; stre
                   <span className="ml-0.5 inline-block h-4 w-[7px] translate-y-[3px] animate-pulse-dot rounded-[2px] bg-accent" />
                 )}
               </div>
-              {isUser && <div className="sr-only">You said</div>}
+              <span className="sr-only">{isUser ? "You said: " : "TokenRoute said: "}</span>
             </div>
           </div>
         );

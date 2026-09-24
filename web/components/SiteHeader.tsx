@@ -7,9 +7,9 @@ import { cn } from "@/lib/utils";
 import { LogoMark } from "./Logo";
 
 const NAV = [
-  { href: "/", label: "Chat" },
+  { href: "/", label: "Playground" },
   { href: "/console", label: "Analytics" },
-  { href: "/dashboard", label: "Keys" },
+  { href: "/dashboard", label: "API Keys" },
   { href: "/docs", label: "Docs" },
 ];
 
@@ -85,6 +85,7 @@ export function SiteHeader({
           className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted transition-colors hover:bg-panel-2 hover:text-slate-200 md:hidden"
           onClick={() => setOpen((v) => !v)}
           aria-label={open ? "Close menu" : "Open menu"}
+          aria-controls="mobile-nav"
           aria-expanded={open}
         >
           {open ? (
@@ -96,7 +97,7 @@ export function SiteHeader({
       </div>
 
       {open && (
-        <nav className="border-t border-edge/80 bg-ink px-4 pb-4 pt-2 md:hidden">
+        <nav id="mobile-nav" className="border-t border-edge/80 bg-ink px-4 pb-4 pt-2 md:hidden">
           <div className="flex flex-col gap-1">
             {NAV.map((item) => (
               <Link

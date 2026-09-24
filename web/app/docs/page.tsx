@@ -50,7 +50,8 @@ export default function DocsPage() {
         <div className="mb-8">
           <h1 className="text-xl font-semibold tracking-tight text-slate-100 sm:text-2xl">Docs</h1>
           <p className="mt-1 text-sm text-muted">
-            Everything below works on the hosted gateway. Self-hosting (free, Apache 2.0):{" "}
+            Everything below runs against the hosted gateway, right now. Prefer your own
+            metal? TokenRoute is free and open source (Apache 2.0):{" "}
             <a href="https://github.com/rizvihasan/tokenroute" target="_blank" rel="noreferrer" className="text-accent hover:underline">
               github.com/rizvihasan/tokenroute
             </a>
@@ -60,20 +61,21 @@ export default function DocsPage() {
         <div className="flex flex-col gap-8">
           <Section id="get-a-key" title="1. Get a key">
             <p>
-              Sign in with Google on the Keys page, create a key. Set a monthly budget cap if
-              you want a hard stop; the gateway returns 402 when you hit it. Bring your own
-              provider key (BYOK) and usage bills to your provider account instead.
+              Sign in with Google on the API Keys page and mint a key in seconds. Add a monthly
+              spend cap if you want a hard stop - the gateway answers 402 the moment you hit it,
+              never a surprise invoice. Prefer your own provider key? BYOK bills usage straight
+              to your provider account.
             </p>
           </Section>
 
           <Section id="call-it" title="2. Call it">
-            <p>Any OpenAI SDK - change base_url, keep everything else:</p>
+            <p>Already using the OpenAI SDK? Change one line and keep everything else:</p>
             <CodeBlock code={PYTHON_SNIPPET} />
           </Section>
 
           <Section id="models" title="3. Model choices">
             <ul className="flex list-disc flex-col gap-1.5 pl-5">
-              <li>{code({ children: "auto" })} - router picks: easy prompts to the cheap lane, hard ones to the strong lane.</li>
+              <li>{code({ children: "auto" })} - the router reads the prompt and picks: easy ones take the cheap lane, hard ones get the strong models.</li>
               <li>{code({ children: "chat-local" })} / {code({ children: "chat-cloud" })} - force a lane.</li>
               <li>
                 {code({ children: "provider:model" })} - explicit: {code({ children: "groq:openai/gpt-oss-120b" })},{" "}
@@ -85,9 +87,9 @@ export default function DocsPage() {
 
           <Section id="features" title="What you get on every call">
             <ul className="flex list-disc flex-col gap-1.5 pl-5">
-              <li>Semantic cache: paraphrased repeat questions answered for $0 (similarity threshold 0.92).</li>
-              <li>Fallback: a failed lane retries on the other lane before erroring.</li>
-              <li>Live analytics: per-request cost, latency, cache hits on the Analytics page.</li>
+              <li>Semantic cache: repeat questions - even paraphrased - answered instantly for $0 (similarity threshold 0.92).</li>
+              <li>Automatic fallback: if one lane stumbles, the other answers before you ever see an error.</li>
+              <li>Live analytics: per-request cost, latency, and cache hits on the Analytics page.</li>
               <li>Function calling: pass {code({ children: "tools" })}/{code({ children: "tool_choice" })}; {code({ children: "tool_calls" })} stream back, tool-result messages work.</li>
               <li>Guardrails: injection filter + card-number redaction (hosted: log mode).</li>
               <li>MCP: POST /mcp with your key - {code({ children: "tokenroute_chat" })}, {code({ children: "tokenroute_usage" })} (metrics scope) for Claude/Cursor.</li>
@@ -100,7 +102,7 @@ export default function DocsPage() {
                 {code({ children: "401" })} missing/revoked key - {code({ children: "402" })} monthly budget cap reached -{" "}
                 {code({ children: "403" })} key lacks the scope - {code({ children: "429" })} rate limited.
               </li>
-              <li>First call after 15 min idle can take ~30-60s (free-tier cold start).</li>
+              <li>First call after 15 quiet minutes can take ~30-60s - the free tier naps.</li>
             </ul>
           </Section>
         </div>

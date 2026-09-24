@@ -78,7 +78,7 @@ export default async function DashboardPage({
       {searchParams.newkey && (
         <div className="animate-fade-up rounded-xl border border-accent/40 bg-accent/5 p-4 sm:p-5 shadow-glow">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm font-semibold text-accent">Key created - copy it now. It is shown once.</p>
+            <p className="text-sm font-semibold text-accent">Your new key, shown exactly once. Copy it now - we can never show it again.</p>
             <CopyButton text={searchParams.newkey} label="Copy key" />
           </div>
           <code className="mt-3 block break-all rounded-lg border border-accent/20 bg-ink px-3 py-2.5 font-mono text-sm text-accent">
@@ -91,7 +91,7 @@ export default async function DashboardPage({
       )}
 
       <Card className="overflow-hidden">
-        <CardHeader title="Your keys" description={`${keys.length} active key${keys.length === 1 ? "" : "s"} on this tenant`} />
+        <CardHeader title="Your keys" description={`${keys.length} active key${keys.length === 1 ? "" : "s"} on your tenant`} />
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
             <thead>
@@ -127,7 +127,7 @@ export default async function DashboardPage({
                 </tr>
               ))}
               {keys.length === 0 && (
-                <tr><td colSpan={6} className="px-5 py-8 text-center text-sm text-muted">No keys yet - create one below.</td></tr>
+                <tr><td colSpan={6} className="px-5 py-8 text-center text-sm text-muted">No keys yet - your first one is seconds away, below.</td></tr>
               )}
             </tbody>
           </table>
@@ -135,23 +135,23 @@ export default async function DashboardPage({
       </Card>
 
       <Card>
-        <CardHeader title="New key" description="Keys are shown once at creation; store them somewhere safe." />
+        <CardHeader title="New key" description="Keys appear once, at the moment of creation. Store them somewhere safe." />
         <CardContent>
           <form action={createKeyAction} className="flex flex-wrap items-end gap-4">
             <Field label="Name" className="w-full sm:w-44">
               <Input name="name" defaultValue="default" />
             </Field>
-            <Field label="Monthly budget cap (USD, optional)" className="w-full sm:w-48">
+            <Field label="Monthly spend cap (USD, optional)" className="w-full sm:w-48">
               <Input name="cap" placeholder="5.00" inputMode="decimal" />
             </Field>
             <fieldset className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-muted">Scopes</span>
+              <span className="text-xs font-medium text-muted">Permissions</span>
               <div className="flex items-center gap-4 rounded-lg border border-edge bg-ink px-3 py-2">
                 <label className="flex items-center gap-2 text-sm text-muted">
-                  <input type="checkbox" name="scopes" value="chat" defaultChecked /> chat
+                  <input type="checkbox" name="scopes" value="chat" defaultChecked /> chat - call models
                 </label>
                 <label className="flex items-center gap-2 text-sm text-muted">
-                  <input type="checkbox" name="scopes" value="metrics" /> metrics
+                  <input type="checkbox" name="scopes" value="metrics" /> metrics - read usage
                 </label>
               </div>
             </fieldset>
@@ -163,7 +163,7 @@ export default async function DashboardPage({
       <Card>
         <CardHeader
           title="Billing"
-          description="Free tier includes a $5/mo platform cap. Pro raises it to $50/mo."
+          description="Free includes $5/month of platform usage. Pro lifts the cap to $50/month, with your budget guardrails intact."
         />
         <CardContent>
           <p className="text-sm text-muted">
@@ -171,7 +171,7 @@ export default async function DashboardPage({
             {billing.status !== "active" ? ` (${billing.status})` : ""}
           </p>
           {searchParams.billing === "unconfigured" && (
-            <p className="mt-2 text-sm text-amber-300">Payments are not switched on yet - checkout opens when the provider account is connected.</p>
+            <p className="mt-2 text-sm text-amber-300">Payments aren't switched on yet - checkout opens the moment the provider account is connected.</p>
           )}
           {billing.plan === "free" && (
             <form action={upgradeAction} className="mt-3">
@@ -183,8 +183,8 @@ export default async function DashboardPage({
 
       <Card>
         <CardHeader
-          title="Bring your own provider keys (BYOK)"
-          description="Your key calls your provider account directly, so usage bills to your provider, not the platform. Encrypted at rest; your key's budget cap still applies as your own safety limit."
+          title="Bring your own keys (BYOK)"
+          description="Plug in your own Groq, OpenAI, or Gemini key and calls bill straight to your provider account - not to us. Encrypted at rest; your spend cap still applies as a safety net."
         />
         <CardContent>
           <form action={byokAction} className="flex flex-wrap items-end gap-4">

@@ -8,8 +8,8 @@ export default function ConsolePage() {
       <div className="mb-6">
         <h1 className="text-xl font-semibold tracking-tight text-slate-100 sm:text-2xl">Analytics</h1>
         <p className="mt-1 text-sm text-muted">
-          Everything the gateway has done lately: routing decisions, cache hits,
-          latency, throughput, and cost - live.
+          Every request, accounted for: which lane answered, how fast the first token
+          landed, what it cost. Streaming in live.
         </p>
       </div>
       <ConsoleDashboard />

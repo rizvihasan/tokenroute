@@ -44,9 +44,9 @@ function LaneSplit({ payload }: { payload: ConsolePayload }) {
   ];
   return (
     <Card>
-      <CardHeader title="Lane distribution" description="Which lane answered each request" />
+      <CardHeader title="Where requests went" description="Cheap lane, strong lane, or free cache" />
       <CardContent>
-        <div className="flex h-3 w-full overflow-hidden rounded-full bg-ink">
+        <div className="flex h-3 w-full overflow-hidden rounded-full bg-ink" role="img" aria-label={`Lane split: ${rows.map(({ lane, n }) => `${lane} ${Math.round((n / total) * 100)} percent`).join(", ")}`}>
           {rows.map(({ lane, n }) =>
             n ? (
               <div
@@ -94,7 +94,7 @@ function TtftHistogram({ events }: { events: RequestEvent[] }) {
   const peak = Math.max(...counts, 1);
   return (
     <Card>
-      <CardHeader title="Time to first token" description={`${ttfts.length} generations in window`} />
+      <CardHeader title="Time to first token" description={`How fast answers start - ${ttfts.length} generations in window`} />
       <CardContent>
         <div className="flex h-28 items-end gap-1.5">
           {counts.map((c, i) => (
@@ -119,7 +119,7 @@ function RequestFeed({ events }: { events: RequestEvent[] }) {
   if (!events.length) return null;
   return (
     <Card className="overflow-hidden">
-      <CardHeader title="Live request feed" description="Most recent requests across all lanes" />
+      <CardHeader title="Live request feed" description="The most recent requests, as they happened" />
       <div className="max-h-[26rem] overflow-auto">
         <div className="min-w-[640px]">
           {events.slice(0, 25).map((e, i) => (
@@ -200,7 +200,7 @@ export function ConsoleDashboard() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
-        <span className="relative flex h-2 w-2">
+        <span className="relative flex h-2 w-2" role="status" aria-label="Live updates on">
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
           <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
         </span>
@@ -222,7 +222,7 @@ export function ConsoleDashboard() {
         <Card>
           <CardContent className="py-10 text-center">
             <p className="text-sm text-muted">
-              No requests recorded yet. Send a message in Chat and watch it land here in real time.
+              Quiet so far. Send a message in the Playground and watch it land here in real time.
             </p>
           </CardContent>
         </Card>
@@ -239,7 +239,7 @@ export function ConsoleDashboard() {
             <MetricCard
               label="Cache hit rate"
               value={`${Math.round(s.cache_hit_rate * 100)}%`}
-              hint={`${s.cache_hits} instant answers - avg sim ${s.avg_similarity_on_hits.toFixed(2)}`}
+              hint={`${s.cache_hits} answers served free - avg sim ${s.avg_similarity_on_hits.toFixed(2)}`}
             />
             <MetricCard label="Avg TTFT" value={fmtMs(s.ttft_avg_ms)} hint={`p50 ${fmtMs(s.ttft_p50_ms)}`} />
             <MetricCard label="p95 TTFT" value={fmtMs(s.ttft_p95_ms)} hint="across generations" />
@@ -249,9 +249,9 @@ export function ConsoleDashboard() {
               hint={`${s.tokens_out.toLocaleString()} tokens out`}
             />
             <MetricCard
-              label="Notional spend"
+              label="Estimated spend"
               value={`$${s.cost_usd.toFixed(4)}`}
-              hint="Groq list prices (free tier)"
+              hint="at list prices - the free tier covers it"
             />
           </div>
 
@@ -266,8 +266,8 @@ export function ConsoleDashboard() {
 
       <Card>
         <CardHeader
-          title="Evaluations (Ragas)"
-          description="Quality scores for the current lane lineup"
+          title="Quality evals (Ragas)"
+          description="Answer-quality scores for the live model lineup"
           action={
             <div className="flex items-center gap-2">
               {evalStatus && <span className="text-xs text-muted">{evalStatus}</span>}
@@ -289,7 +289,7 @@ export function ConsoleDashboard() {
               ))}
             </div>
           ) : (
-            <div className="text-sm text-muted">No eval results yet.</div>
+            <div className="text-sm text-muted">No eval runs yet - kick one off to score the current lineup.</div>
           )}
         </CardContent>
       </Card>
