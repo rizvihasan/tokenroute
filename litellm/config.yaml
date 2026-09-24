@@ -1,0 +1,28 @@
+model_list:
+  - model_name: chat-local
+    litellm_params:
+      model: ollama/llama3.1:8b-instruct-q4_K_M
+      api_base: http://ollama:11434
+  - model_name: chat-cloud
+    litellm_params:
+      model: gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: embed-local
+    litellm_params:
+      model: ollama/nomic-embed-text
+      api_base: http://ollama:11434
+
+router_settings:
+  # if the local model errors or stalls, escalate to the cloud model
+  fallbacks: [{"chat-local": ["chat-cloud"]}]
+  timeout: 120
+  num_retries: 1
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  # spend + rate controls live at the proxy so every caller is governed
+  max_budget: 5.0          # USD per budget window
+  budget_duration: 30d
+
+litellm_settings:
+  drop_params: true

@@ -1,0 +1,16 @@
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+# node
+node_modules/
+.next/
+out/
+# env & local
+.env
+*.local
+.DS_Store
+# data
+data/
+ollama/
