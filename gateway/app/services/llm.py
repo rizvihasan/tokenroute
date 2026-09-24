@@ -1,4 +1,12 @@
-"""Async client for the LiteLLM proxy (OpenAI-compatible)."""
+"""Async client for the model providers, all OpenAI-compatible.
+
+The deployed stack talks directly to Groq (chat) and Jina (embeddings).
+There is no proxy container in the middle: the official LiteLLM image needs
+~4Gi per worker and would not stay up on a 512MB free-tier instance, so the
+routing it did (alias -> provider model, one fallback hop) lives here now.
+Local docker-compose still runs LiteLLM for the Ollama path; point the
+CHAT_* / EMBED_* env vars at it and the same code works unchanged.
+"""
 
 from __future__ import annotations
 
@@ -10,37 +18,58 @@ import httpx
 from ..config import get_settings
 
 
-def _headers() -> dict[str, str]:
-    return {"Authorization": f"Bearer {get_settings().litellm_master_key}"}
+def _chat_provider(alias: str) -> tuple[str, str, str]:
+    """Resolve a lane alias to (base_url, api_key, provider model)."""
+    s = get_settings()
+    if alias == s.lane_cloud_alias:
+        return (s.chat_cloud_base_url, s.chat_cloud_api_key or s.groq_api_key,
+                s.chat_cloud_model)
+    return (s.chat_local_base_url, s.chat_local_api_key or s.groq_api_key,
+            s.chat_local_model)
 
 
 async def embed(texts: list[str]) -> list[list[float]]:
-    settings = get_settings()
-    async with httpx.AsyncClient(base_url=settings.litellm_base_url, timeout=120) as client:
+    s = get_settings()
+    payload: dict = {"model": s.embed_model, "input": texts}
+    if s.embed_dimensions:
+        payload["dimensions"] = s.embed_dimensions
+    async with httpx.AsyncClient(base_url=s.embed_base_url, timeout=120) as client:
         resp = await client.post(
-            "/v1/embeddings",
-            headers=_headers(),
-            json={"model": settings.embed_alias, "input": texts},
+            "/embeddings",
+            headers={"Authorization": f"Bearer {s.embed_api_key or s.jina_api_key}"},
+            json=payload,
         )
+        if resp.status_code == 422 and "dimensions" in payload:
+            # provider without Matryoshka support: retry at native size
+            payload.pop("dimensions")
+            resp = await client.post(
+                "/embeddings",
+                headers={"Authorization": f"Bearer {s.embed_api_key or s.jina_api_key}"},
+                json=payload,
+            )
         resp.raise_for_status()
         data = resp.json()
     return [row["embedding"] for row in sorted(data["data"], key=lambda d: d["index"])]
 
 
-async def stream_chat(
-    messages: list[dict], model_alias: str
+async def _stream_once(
+    messages: list[dict], alias: str
 ) -> AsyncIterator[dict]:
-    """Yield parsed SSE events: {'token': str} or {'usage': {...}} or {'error': ...}."""
-    settings = get_settings()
+    """Stream one attempt against the alias's provider. Raises httpx.HTTPError
+    on transport failure; yields {'error'} on a non-200 before any token."""
+    base, key, model = _chat_provider(alias)
     payload = {
-        "model": model_alias,
+        "model": model,
         "messages": messages,
         "stream": True,
         "stream_options": {"include_usage": True},
     }
-    async with httpx.AsyncClient(base_url=settings.litellm_base_url, timeout=180) as client:
+    async with httpx.AsyncClient(base_url=base, timeout=180) as client:
         async with client.stream(
-            "POST", "/v1/chat/completions", headers=_headers(), json=payload
+            "POST",
+            "/chat/completions",
+            headers={"Authorization": f"Bearer {key}"},
+            json=payload,
         ) as resp:
             if resp.status_code != 200:
                 body = await resp.aread()
@@ -66,14 +95,52 @@ async def stream_chat(
                     yield {"usage": event["usage"]}
 
 
+async def stream_chat(messages: list[dict], model_alias: str) -> AsyncIterator[dict]:
+    """Yield {'token'} / {'usage'} / {'error'} events.
+
+    Fallback (previously LiteLLM's router_settings.fallbacks): if the chosen
+    lane fails before producing any token - non-200 or unreachable - retry
+    once against the other lane. Mid-stream failures cannot fall back: the
+    client already has partial output, so we surface the error instead.
+    """
+    s = get_settings()
+    aliases = [model_alias]
+    if model_alias == s.lane_local_alias:
+        aliases.append(s.lane_cloud_alias)
+    elif model_alias == s.lane_cloud_alias:
+        aliases.append(s.lane_local_alias)
+
+    last_error = "no provider attempted"
+    for alias in aliases:
+        yielded_token = False
+        try:
+            async for event in _stream_once(messages, alias):
+                if "error" in event and not yielded_token:
+                    last_error = event["error"]
+                    break  # clean pre-token refusal: try the fallback lane
+                if "token" in event:
+                    yielded_token = True
+                yield event
+            else:
+                return  # stream completed
+            continue
+        except httpx.HTTPError as exc:
+            if yielded_token:
+                yield {"error": f"stream interrupted: {exc.__class__.__name__}"}
+                return
+            last_error = f"upstream unreachable: {exc.__class__.__name__}"
+            continue
+    yield {"error": last_error}
+
+
 async def complete_chat(messages: list[dict], model_alias: str) -> dict:
     """Non-streaming completion, used by the eval runner."""
-    settings = get_settings()
-    async with httpx.AsyncClient(base_url=settings.litellm_base_url, timeout=180) as client:
+    base, key, model = _chat_provider(model_alias)
+    async with httpx.AsyncClient(base_url=base, timeout=180) as client:
         resp = await client.post(
-            "/v1/chat/completions",
-            headers=_headers(),
-            json={"model": model_alias, "messages": messages},
+            "/chat/completions",
+            headers={"Authorization": f"Bearer {key}"},
+            json={"model": model, "messages": messages},
         )
         resp.raise_for_status()
         return resp.json()

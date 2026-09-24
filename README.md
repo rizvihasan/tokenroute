@@ -21,12 +21,12 @@ flowchart LR
         MET[metrics recorder]
     end
 
-    subgraph proxy["litellm proxy"]
-        Route[model router<br/>fallbacks · retries<br/>rate limits · budget caps]
+    subgraph providers["providers (OpenAI-compatible)"]
+        Route[lane aliases -><br/>provider model<br/>one fallback hop]
     end
 
-    Local[ollama<br/>llama3.1 8B · 4-bit]
-    Cloud[gpt-4o-mini]
+    Local[ollama<br/>llama3.1 8B · 4-bit<br/>local dev, via litellm]
+    Cloud[groq<br/>gpt-oss-20b / 120b]
     Redis[(redis<br/>cache · metrics · queues)]
     PG[(postgres + pgvector<br/>RAG chunks)]
     Worker[rq worker<br/>ingest · evals]
@@ -52,7 +52,7 @@ flowchart LR
 | Topic | Where |
 | --- | --- |
 | Quantized local model serving | Ollama running `llama3.1:8b-instruct-q4_K_M` behind an OpenAI-compatible API |
-| Inference routing + fallback | LiteLLM proxy: local-first lanes, automatic cloud fallback on error/timeout, per-key rate limits, budget caps |
+| Inference routing + fallback | Lane router in the gateway: cheap-lane-first heuristic, automatic cross-lane fallback on error/timeout, per-IP rate limits. Local dev puts a LiteLLM proxy in front of Ollama; the $0 hosted demo routes to Groq directly (the official LiteLLM image needs ~4Gi/worker and could not stay up on a 512MB free-tier instance) |
 | Semantic response caching | Prompt embeddings + cosine similarity in Redis; a paraphrase hit returns the answer for $0 and ~0 ms |
 | RAG | Chunker, embeddings (`nomic-embed-text`), pgvector retrieval, context-grounded prompting |
 | Streaming UX | True token-by-token SSE end to end: FastAPI generator -> Next.js route proxy -> browser `ReadableStream` |
@@ -93,7 +93,7 @@ Tracing: create a free Langfuse cloud project, drop the keys into `.env`, restar
 
 ## Design decisions
 
-- **LiteLLM as the model boundary.** The app never talks to a model provider directly. Routing, fallbacks, retries, timeouts, rate limits, and budgets are proxy config, not application code - swapping or adding a model is a YAML edit.
+- **One OpenAI-compatible client, env-swappable providers.** The app talks to any OpenAI-compatible endpoint through one small client; lane aliases resolve to (base URL, key, model) from env. Local dev points at the LiteLLM container for the Ollama path, the hosted demo points straight at Groq/Jina - swapping or adding a model is an env edit, not a code change.
 - **Semantic cache in front of everything.** Exact-match caches miss on every paraphrase. Embedding the prompt and matching on cosine similarity (default threshold 0.92) makes "what is the cache threshold?" and "how high is the cache cutoff?" the same question. Known limit: the scan is O(N) over a capped entry set - fine at personal scale; the interface isolates the swap to pgvector/Redis vector search.
 - **Cheap lane by default.** The routing heuristic keeps short, simple, retrieval-grounded prompts on the local model and escalates long, reasoning-heavy, or code-heavy ones. Fallbacks at the proxy cover failure; the heuristic covers cost.
 - **Heavy work off the request path.** Ingestion and eval runs are RQ jobs. The chat path never chunks a document or waits for Ragas.
@@ -120,9 +120,8 @@ cd web && npm install && npm run typecheck && npm run build
 
 ## Deploying the demo ($0)
 
-Live demo: https://tokenroute.vercel.app (gateway https://tokenroute-gateway.onrender.com,
-proxy https://tokenroute-litellm.onrender.com). Free services sleep after 15 min idle,
-so the first message can take ~30-60s.
+Live demo: https://tokenroute.vercel.app (gateway https://tokenroute-gateway.onrender.com).
+Free services sleep after 15 min idle, so the first message can take ~30-60s.
 
 The compose stack is the real thing; a hosted demo is wired for free tiers:
 
@@ -132,12 +131,14 @@ The compose stack is the real thing; a hosted demo is wired for free tiers:
   request log in Redis)
 - **gateway** -> Render free web service (Docker, `RUN_WORKER=1` runs the RQ
   worker in-process; free tiers have no background workers)
-- **litellm** -> Render free web service (Docker, `litellm/Dockerfile` +
-  `config.deploy.yaml`)
 - **Redis** -> Upstash free; **Postgres** -> Neon free (pgvector built in)
 - **models** -> Groq (OpenAI-compatible) serves both lanes: `openai/gpt-oss-20b`
   as the cheap lane and `openai/gpt-oss-120b` as the escalation lane. (Groq moved
   the Llama 3.x models to enterprise-only; gpt-oss is their current free-tier family.)
+  Embeddings: Jina `jina-embeddings-v3` direct. The hosted demo originally ran a
+  LiteLLM proxy container; it OOMed repeatedly on Render's 512MB free tier (its
+  docs recommend 4Gi/worker), so routing moved into the gateway and the proxy was
+  cut from the deployed stack. `litellm/` remains for local dev.
   Embeddings via Jina v3 (OpenAI-compatible). Set `EMBEDDING_DIM=1024`.
 - `render.yaml` is the blueprint; CI runs in GitHub Actions (`.github/workflows/ci.yml`).
 

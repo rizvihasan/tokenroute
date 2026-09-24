@@ -52,7 +52,13 @@ async def chat(req: ChatRequest, request: Request):
     if not await store.check_rate_limit(client_ip):
         raise HTTPException(status_code=429, detail="rate limit exceeded")
 
-    cached = await cache.lookup(prompt) if req.use_cache else None
+    cached = None
+    if req.use_cache:
+        try:
+            cached = await cache.lookup(prompt)
+        except Exception:
+            # cache is an optimisation, never a hard dependency of answering
+            cached = None
     if cached is not None:
         async def replay():
             started = time.perf_counter()
@@ -150,7 +156,10 @@ async def chat(req: ChatRequest, request: Request):
             await store.incr_metric("cost_usd", cost, req.conversation_id)
 
             if req.use_cache and text:
-                await cache.save(prompt, text, model_alias)
+                try:
+                    await cache.save(prompt, text, model_alias)
+                except Exception:
+                    pass  # a failed cache write must not kill a good answer
             span.update(output=text[:500], metadata={"cost_usd": cost, "ttft_ms": (
                 (first_token_at - started) * 1000 if first_token_at else None)})
 

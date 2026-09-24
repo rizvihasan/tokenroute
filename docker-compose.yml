@@ -48,7 +48,18 @@ services:
     build: ./gateway
     env_file: .env
     environment:
-      LITELLM_BASE_URL: http://litellm:4000
+      # local dev keeps the LiteLLM container (Ollama path); deployed prod
+      # overrides these to Groq/Jina direct - same OpenAI-compatible code path
+      CHAT_LOCAL_BASE_URL: http://litellm:4000/v1
+      CHAT_LOCAL_API_KEY: ${LITELLM_MASTER_KEY:-sk-tokenroute-dev}
+      CHAT_LOCAL_MODEL: chat-local
+      CHAT_CLOUD_BASE_URL: http://litellm:4000/v1
+      CHAT_CLOUD_API_KEY: ${LITELLM_MASTER_KEY:-sk-tokenroute-dev}
+      CHAT_CLOUD_MODEL: chat-cloud
+      EMBED_BASE_URL: http://litellm:4000/v1
+      EMBED_API_KEY: ${LITELLM_MASTER_KEY:-sk-tokenroute-dev}
+      EMBED_MODEL: embed-local
+      EMBED_DIMENSIONS: "0"
       REDIS_URL: redis://redis:6379/0
       DATABASE_URL: postgresql://postgres:postgres@db:5432/tokenroute
     ports:
@@ -66,7 +77,18 @@ services:
     command: rq worker --url redis://redis:6379/0 ingest evals
     env_file: .env
     environment:
-      LITELLM_BASE_URL: http://litellm:4000
+      # local dev keeps the LiteLLM container (Ollama path); deployed prod
+      # overrides these to Groq/Jina direct - same OpenAI-compatible code path
+      CHAT_LOCAL_BASE_URL: http://litellm:4000/v1
+      CHAT_LOCAL_API_KEY: ${LITELLM_MASTER_KEY:-sk-tokenroute-dev}
+      CHAT_LOCAL_MODEL: chat-local
+      CHAT_CLOUD_BASE_URL: http://litellm:4000/v1
+      CHAT_CLOUD_API_KEY: ${LITELLM_MASTER_KEY:-sk-tokenroute-dev}
+      CHAT_CLOUD_MODEL: chat-cloud
+      EMBED_BASE_URL: http://litellm:4000/v1
+      EMBED_API_KEY: ${LITELLM_MASTER_KEY:-sk-tokenroute-dev}
+      EMBED_MODEL: embed-local
+      EMBED_DIMENSIONS: "0"
       REDIS_URL: redis://redis:6379/0
       DATABASE_URL: postgresql://postgres:postgres@db:5432/tokenroute
     depends_on:

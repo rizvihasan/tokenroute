@@ -1,23 +1,12 @@
 # One-click-ish blueprint for the $0 hosted demo.
 # External prerequisites (free tiers): Upstash Redis, Neon Postgres (pgvector),
 # Groq API key, Jina API key. Vercel hosts web/ separately.
+#
+# There is deliberately no LiteLLM service here: the official image needs
+# ~4Gi per worker (its own docs) and could not stay up on Render's 512MB free
+# tier, so the gateway routes to Groq/Jina directly (OpenAI-compatible).
+# Local docker-compose still runs LiteLLM for the Ollama path.
 services:
-  - type: web
-    name: tokenroute-litellm
-    runtime: docker
-    plan: free
-    rootDir: litellm
-    healthCheckPath: /health/liveness
-    envVars:
-      - key: GROQ_API_KEY
-        sync: false
-      - key: JINA_API_KEY
-        sync: false
-      - key: LITELLM_MASTER_KEY
-        generateValue: true
-      - key: MALLOC_ARENA_MAX # curb glibc arena growth on the 512MB free tier
-        value: "2"
-
   - type: web
     name: tokenroute-gateway
     runtime: docker
@@ -27,18 +16,17 @@ services:
     envVars:
       - key: RUN_WORKER # demo: worker runs in-process (free tier has no workers)
         value: "1"
-      - key: LITELLM_BASE_URL # public URL: fromService host is internal-only
-        value: "https://tokenroute-litellm.onrender.com" # DNS and breaks chat
-      - key: LITELLM_MASTER_KEY
-        fromService:
-          name: tokenroute-litellm
-          type: web
-          envVarKey: LITELLM_MASTER_KEY
+      - key: GROQ_API_KEY
+        sync: false
+      - key: JINA_API_KEY
+        sync: false
       - key: REDIS_URL # Upstash rediss:// URL
         sync: false
       - key: DATABASE_URL # Neon postgres:// URL
         sync: false
-      - key: EMBEDDING_DIM # jina-embeddings-v3
+      - key: EMBEDDING_DIM # jina-embeddings-v3 native size
+        value: "1024"
+      - key: EMBED_DIMENSIONS # request embeddings at the pgvector column size
         value: "1024"
       - key: CLOUD_INPUT_COST_PER_MTOK # Groq gpt-oss-120b list prices, so the
         value: "0.15" # console shows notional cost even on the free tier

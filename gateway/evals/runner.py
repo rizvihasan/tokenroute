@@ -53,16 +53,16 @@ async def run_golden_set(lane: str = "local") -> dict:
 
     judge_llm = LangchainLLMWrapper(
         ChatOpenAI(
-            model=settings.lane_cloud_alias,
-            base_url=f"{settings.litellm_base_url}/v1",
-            api_key=settings.litellm_master_key,
+            model=settings.chat_cloud_model,
+            base_url=settings.chat_cloud_base_url,
+            api_key=settings.chat_cloud_api_key or settings.groq_api_key,
         )
     )
     judge_embed = LangchainEmbeddingsWrapper(
         OpenAIEmbeddings(
-            model=settings.embed_alias,
-            base_url=f"{settings.litellm_base_url}/v1",
-            api_key=settings.litellm_master_key,
+            model=settings.embed_model,
+            base_url=settings.embed_base_url,
+            api_key=settings.embed_api_key or settings.jina_api_key,
         )
     )
 

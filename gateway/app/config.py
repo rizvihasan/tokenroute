@@ -1,7 +1,5 @@
 from functools import lru_cache
 
-from pydantic import field_validator
-
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,21 +10,28 @@ class Settings(BaseSettings):
 
     local_model: str = "ollama/llama3.1:8b-instruct-q4_K_M"
     cloud_model: str = "gpt-4o-mini"
-    # model aliases exposed by the litellm proxy
+    # lane aliases used across logs, metrics and the UI
     lane_local_alias: str = "chat-local"
     lane_cloud_alias: str = "chat-cloud"
     embed_alias: str = "embed-local"
 
-    litellm_base_url: str = "http://localhost:4000"
-
-    @field_validator("litellm_base_url")
-    @classmethod
-    def _with_scheme(cls, v: str) -> str:
-        # Render's fromService host property provides a bare hostname.
-        if v and not v.startswith(("http://", "https://")):
-            return f"https://{v}"
-        return v
-    litellm_master_key: str = "sk-tokenroute-dev"
+    # Provider endpoints (OpenAI-compatible). The deployed stack goes
+    # straight to Groq / Jina - no proxy container. Local docker-compose
+    # overrides these to the LiteLLM container for the Ollama path.
+    chat_local_base_url: str = "https://api.groq.com/openai/v1"
+    chat_local_api_key: str = ""  # falls back to groq_api_key
+    chat_local_model: str = "openai/gpt-oss-20b"
+    chat_cloud_base_url: str = "https://api.groq.com/openai/v1"
+    chat_cloud_api_key: str = ""  # falls back to groq_api_key
+    chat_cloud_model: str = "openai/gpt-oss-120b"
+    embed_base_url: str = "https://api.jina.ai/v1"
+    embed_api_key: str = ""  # falls back to jina_api_key
+    embed_model: str = "jina-embeddings-v3"
+    # 0 = provider native size; when set it must equal embedding_dim (the
+    # pgvector column size). jina-embeddings-v3 native is 1024.
+    embed_dimensions: int = 0
+    groq_api_key: str = ""
+    jina_api_key: str = ""
 
     redis_url: str = "redis://localhost:6379/0"
     database_url: str = "postgresql://postgres:postgres@localhost:5432/tokenroute"
