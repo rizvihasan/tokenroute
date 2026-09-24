@@ -21,7 +21,9 @@ export function Chat() {
   const conversationId = useRef(`web-${Math.random().toString(36).slice(2, 10)}`);
 
   useEffect(() => {
-    window.scrollTo({ top: document.documentElement.scrollHeight });
+    if (messages.length > 0) {
+      window.scrollTo({ top: document.documentElement.scrollHeight });
+    }
   }, [messages]);
 
   const send = useCallback(
