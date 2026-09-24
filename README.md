@@ -1,156 +1,133 @@
 # TokenRoute
 
-A production-grade LLM inference gateway with a RAG chat app and a live ops console - built to show the full inference-engineering loop, not just a demo prompt.
+[![CI](https://github.com/rizvihasan/tokenroute/actions/workflows/ci.yml/badge.svg)](https://github.com/rizvihasan/tokenroute/actions/workflows/ci.yml)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Live demo](https://img.shields.io/badge/demo-live-brightgreen)](https://tokenroute.vercel.app)
 
-One-line: a ChatGPT-style app where you own the inference layer. A local quantized model serves cheap queries, a cloud model takes the hard ones, every response is semantically cached, traced, and evaluated, and its cost and latency are live on a dashboard.
+**The LLM gateway that cuts your bill, not just your logs.** TokenRoute sits between your app and any OpenAI-compatible provider: it routes easy prompts to cheap models, falls back when a provider fails, and answers repeat questions from a **semantic cache** for $0 - with a live analytics console built in, free and self-hostable, no paid observability tier.
+
+```
+your app  -->  TokenRoute  -->  cheap lane (fast model)
+                  |          ->  cloud lane (strong model)
+                  |          ->  semantic cache (paraphrase = $0, ~0 ms)
+                  +-> console: cost, latency, lane, cache hit rate - live
+```
+
+## Why not Portkey / LiteLLM / Langfuse?
+
+- **Portkey's** free self-host has no observability - the console is the $49/mo upsell. TokenRoute ships the full console free.
+- **LiteLLM** is a great router with no UI; its budget counters drift under concurrency ([documented](https://theorydelta.com/findings/llm-gateway-silent-failures)) and the official image wants ~4Gi RAM per worker. TokenRoute meters every request in Redis and runs in ~200MB.
+- **Langfuse** is observability without a gateway, and self-hosting needs Postgres + ClickHouse + Redis + S3. TokenRoute is gateway + console in one compose file.
+- **Helicone** was acquired and frozen in March 2026.
+
+Full comparison: [docs/PRODUCT.md](docs/PRODUCT.md)
+
+## Quickstart (< 5 min, Docker)
+
+```bash
+git clone https://github.com/rizvihasan/tokenroute && cd tokenroute
+cp .env.example .env        # works as-is for local-only
+make up                     # builds and starts the full stack
+make models                 # one-time: pulls llama3.1:8b + nomic-embed (~5GB)
+```
+
+Chat UI at http://localhost:3000, ops console at http://localhost:3000/console, gateway API at http://localhost:8000.
+
+No Docker / no GPU? Point the gateway at hosted free tiers instead - set `GROQ_API_KEY` + `JINA_API_KEY` in `.env` (both have free tiers) and run the gateway alone; the routing, cache, and console story is identical. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#providers).
+
+## Use it from your app
+
+Any OpenAI-compatible client works:
+
+```python
+from openai import OpenAI
+client = OpenAI(base_url="http://localhost:8000/v1", api_key="not-needed")
+client.chat.completions.create(model="chat-local",   # or "chat-cloud" to force the strong lane
+                               messages=[{"role": "user", "content": "Explain p95 latency"}])
+```
+
+`chat-local` / `chat-cloud` force a lane; POST `/chat` (SSE) gets you the full pipeline - rate limit, cache lookup, RAG, lane heuristic, streamed tokens, and per-request cost/latency metering.
+
+## What's inside
+
+| Piece | What it does |
+| --- | --- |
+| Lane router | Cheap-lane-first heuristic (length, reasoning markers, code, retrieved-context size); automatic cross-lane fallback on error/timeout |
+| Semantic cache | Prompt embeddings + cosine similarity (threshold 0.92); a paraphrase of a past question returns instantly for $0 |
+| Analytics console | Live request feed, cache hit rate, TTFT p50/p95, lane distribution, notional spend - served by `GET /metrics/console` |
+| RAG | Chunker, embeddings, pgvector retrieval, context-grounded prompting (`POST /ingest` your docs) |
+| Evals | Ragas runner over a golden set, one click from the console |
+| Metrics | Per-request cost, TTFT, tokens/sec, lane - counters in Redis, derived at read time |
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    subgraph web["web · Next.js 14 + TS + Tailwind"]
-        UI[chat UI · SSE streaming]
-        Console[ops console · live metrics]
+    subgraph web["web - Next.js 14"]
+        UI[chat UI - SSE]
+        Console[analytics console]
     end
-
-    subgraph gateway["gateway · FastAPI"]
-        RL[rate limiter]
-        SC[semantic cache]
-        RT[lane router]
-        RAG[RAG retrieval]
-        MET[metrics recorder]
+    subgraph gw["gateway - FastAPI"]
+        RL[rate limiter] --> SC[semantic cache]
+        SC --> RAG[RAG retrieval] --> RT[lane router]
+        RT --> LLM[OpenAI-compatible client<br/>alias -> provider, fallback]
+        GW2[metrics recorder]
     end
+    Redis[(Redis<br/>cache - metrics - queues)]
+    PG[(Postgres + pgvector)]
+    Prov[providers<br/>Ollama local - Groq/Jina hosted]
 
-    subgraph providers["providers (OpenAI-compatible)"]
-        Route[lane aliases -><br/>provider model<br/>one fallback hop]
-    end
-
-    Local[ollama<br/>llama3.1 8B · 4-bit<br/>local dev, via litellm]
-    Cloud[groq<br/>gpt-oss-20b / 120b]
-    Redis[(redis<br/>cache · metrics · queues)]
-    PG[(postgres + pgvector<br/>RAG chunks)]
-    Worker[rq worker<br/>ingest · evals]
-    LF[langfuse traces]
-
-    UI -->|SSE| gateway
-    Console -->|poll /metrics| gateway
-    gateway --> RL --> SC
-    SC -->|miss| RAG --> RT
-    RT --> Route
-    Route --> Local
-    Route -->|fallback / escalation| Cloud
-    SC <--> Redis
-    MET --> Redis
-    RAG <--> PG
-    Worker --> PG
-    Worker -->|ragas scores| Redis
-    gateway -.-> LF
+    UI --> gw
+    Console --> gw
+    gw --> Redis
+    RAG --> PG
+    LLM --> Prov
 ```
 
-## What it demonstrates
+Design decisions and data flow: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
-| Topic | Where |
-| --- | --- |
-| Quantized local model serving | Ollama running `llama3.1:8b-instruct-q4_K_M` behind an OpenAI-compatible API |
-| Inference routing + fallback | Lane router in the gateway: cheap-lane-first heuristic, automatic cross-lane fallback on error/timeout, per-IP rate limits. Local dev puts a LiteLLM proxy in front of Ollama; the $0 hosted demo routes to Groq directly (the official LiteLLM image needs ~4Gi/worker and could not stay up on a 512MB free-tier instance) |
-| Semantic response caching | Prompt embeddings + cosine similarity in Redis; a paraphrase hit returns the answer for $0 and ~0 ms |
-| RAG | Chunker, embeddings (`nomic-embed-text`), pgvector retrieval, context-grounded prompting |
-| Streaming UX | True token-by-token SSE end to end: FastAPI generator -> Next.js route proxy -> browser `ReadableStream` |
-| Scaling patterns | RQ background queues for ingestion and evals, fixed-window rate limiting, spend caps at the proxy |
-| Observability | TTFT, tokens/sec, cost, cache-hit rate, lane breakdown in Redis; optional Langfuse traces per request |
-| Evals | 20-pair golden set scored by Ragas (faithfulness, answer relevancy, context precision) as a queued batch job |
-| Production frontend | Next.js 14 App Router, strict TypeScript, streaming chat + ops console |
+## Live demo ($0 hosted)
 
-## Quickstart
-
-Prereqs: Docker, ~8 GB free RAM (an 8B 4-bit model plus the stack). On a smaller machine, edit `LOCAL_MODEL` in `.env` to `ollama/llama3.2:3b-instruct-q4_K_M`.
-
-```bash
-cp .env.example .env        # add OPENAI_API_KEY for the cloud fallback (optional)
-make up                     # build + start all 7 services
-make models                 # one-time model pull into ollama (~5 GB)
-```
-
-Then:
-
-- Chat: http://localhost:3000
-- Ops console: http://localhost:3000/console
-- Gateway API: http://localhost:8000/docs
-
-Seed the RAG store and run evals:
-
-```bash
-curl -X POST localhost:8000/ingest -H 'content-type: application/json' -d '{
-  "doc_id": "design-notes",
-  "text": "TokenRoute routes cheap queries to a local quantized model ..."
-}'
-
-curl -X POST localhost:8000/evals -H 'content-type: application/json' -d '{"lane": "local"}'
-# watch scores appear on the console
-```
-
-Tracing: create a free Langfuse cloud project, drop the keys into `.env`, restart the gateway. Every chat request gets a trace with lane, cost, and latency.
-
-## Design decisions
-
-- **One OpenAI-compatible client, env-swappable providers.** The app talks to any OpenAI-compatible endpoint through one small client; lane aliases resolve to (base URL, key, model) from env. Local dev points at the LiteLLM container for the Ollama path, the hosted demo points straight at Groq/Jina - swapping or adding a model is an env edit, not a code change.
-- **Semantic cache in front of everything.** Exact-match caches miss on every paraphrase. Embedding the prompt and matching on cosine similarity (default threshold 0.92) makes "what is the cache threshold?" and "how high is the cache cutoff?" the same question. Known limit: the scan is O(N) over a capped entry set - fine at personal scale; the interface isolates the swap to pgvector/Redis vector search.
-- **Cheap lane by default.** The routing heuristic keeps short, simple, retrieval-grounded prompts on the local model and escalates long, reasoning-heavy, or code-heavy ones. Fallbacks at the proxy cover failure; the heuristic covers cost.
-- **Heavy work off the request path.** Ingestion and eval runs are RQ jobs. The chat path never chunks a document or waits for Ragas.
-- **Metrics in Redis, not a database.** Counters and sums in hashes (global + per-conversation); averages and hit rates are derived at read time. Zero extra infrastructure.
+https://tokenroute.vercel.app - console at [/console](https://tokenroute.vercel.app/console).
+Runs on free tiers (Vercel + Render + Upstash + Neon + Groq + Jina); services sleep after 15 min idle, so the first message can take ~30-60s. The hosted demo swaps local Ollama for Groq's gpt-oss models (no free tier runs an 8B quantized model); the routing/cache/metrics story is identical.
 
 ## Repo layout
 
 ```
-gateway/    FastAPI service: /chat (SSE), /ingest, /evals, /metrics
+gateway/    FastAPI: /chat (SSE), /v1 (OpenAI-compatible), /ingest, /evals, /metrics
   app/services/   cache, routing, rag, db, llm, store, tracing
   app/workers/    RQ jobs (ingest, evals)
   evals/          golden set + Ragas runner
   tests/          unit tests (no services required)
-web/        Next.js 14 frontend: chat + ops console
-litellm/    proxy config (models, fallbacks, budgets)
+web/        Next.js 14: chat + analytics console
+litellm/    local-dev proxy config (Ollama path)
+docs/       PRODUCT.md (positioning) - ARCHITECTURE.md (internals)
 ```
 
 ## Tests
 
 ```bash
-cd gateway && pip install -r requirements.txt && python -m pytest tests -q
+make test        # gateway unit tests, no services required
 cd web && npm install && npm run typecheck && npm run build
 ```
 
-## Deploying the demo ($0)
+## Roadmap
 
-Live demo: https://tokenroute.vercel.app (gateway https://tokenroute-gateway.onrender.com).
-Free services sleep after 15 min idle, so the first message can take ~30-60s.
-
-The compose stack is the real thing; a hosted demo is wired for free tiers:
-
-- **web** -> Vercel (root dir `web/`, one env var: `GATEWAY_INTERNAL_URL`);
-  includes the analytics console at `/console` (lane distribution, cache hit
-  rate, TTFT percentiles, live request feed - all derived from the gateway's
-  request log in Redis)
-- **gateway** -> Render free web service (Docker, `RUN_WORKER=1` runs the RQ
-  worker in-process; free tiers have no background workers)
-- **Redis** -> Upstash free; **Postgres** -> Neon free (pgvector built in)
-- **models** -> Groq (OpenAI-compatible) serves both lanes: `openai/gpt-oss-20b`
-  as the cheap lane and `openai/gpt-oss-120b` as the escalation lane. (Groq moved
-  the Llama 3.x models to enterprise-only; gpt-oss is their current free-tier family.)
-  Embeddings: Jina `jina-embeddings-v3` direct. The hosted demo originally ran a
-  LiteLLM proxy container; it OOMed repeatedly on Render's 512MB free tier (its
-  docs recommend 4Gi/worker), so routing moved into the gateway and the proxy was
-  cut from the deployed stack. `litellm/` remains for local dev.
-  Embeddings via Jina v3 (OpenAI-compatible). Set `EMBEDDING_DIM=1024`.
-- `render.yaml` is the blueprint; CI runs in GitHub Actions (`.github/workflows/ci.yml`).
-
-Honest tradeoff: no free tier runs a quantized 8B model, so the deployed demo
-swaps local Ollama for Groq's hosted gpt-oss models - the routing, fallback,
-caching, and metrics story is identical, and the local-quantized path stays one
-`docker compose up` away. Free Render services sleep after 15 min idle; the
-first request after idle cold-starts (~30-60s).
+- Multi-tenancy: per-user API keys, per-key budgets and rate limits
+- Provider breadth: first-class Anthropic, Gemini, Bedrock configs
+- Learned lane router (replacing the heuristic)
+- Streaming usage metering for WebSocket/agent workloads
 
 ## Honest limitations
 
-- Semantic cache lookup is a linear scan (documented above).
-- The lane heuristic is intentionally simple and inspectable; a learned router is the obvious next step.
-- Ragas judging uses the cloud model, so eval runs need `OPENAI_API_KEY`.
-- Single-node compose stack; the scaling story is the queue + proxy patterns, not horizontal replicas.
+- Semantic cache lookup is a linear scan over a capped entry set - fine at personal/team scale; the interface isolates a swap to pgvector or Redis vector search.
+- The lane heuristic is intentionally simple and inspectable.
+- Single-node compose stack; horizontal scale is future work, not claimed.
+
+## Contributing
+
+Issues and PRs welcome - see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License
+
+Apache 2.0 - [LICENSE](LICENSE). Self-host the whole thing, free, forever.
