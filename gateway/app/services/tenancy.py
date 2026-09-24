@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS api_keys (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     revoked_at TIMESTAMPTZ
 );
+ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS scopes TEXT[] NOT NULL DEFAULT '{chat}';
 CREATE TABLE IF NOT EXISTS provider_keys (
     tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     provider TEXT NOT NULL,
@@ -50,12 +51,19 @@ CREATE TABLE IF NOT EXISTS provider_keys (
 """
 
 
+VALID_SCOPES = ("chat", "metrics")
+
+
 @dataclass
 class TenantContext:
     tenant_id: str
     key_id: str
     provider_keys: dict[str, str] = field(default_factory=dict)  # provider -> plaintext
     monthly_cap_usd: float | None = None
+    scopes: tuple[str, ...] = ("chat",)
+
+    def has_scope(self, scope: str) -> bool:
+        return scope in self.scopes
 
 
 def _fernet() -> Fernet:
@@ -98,17 +106,19 @@ async def create_tenant(email: str, name: str | None = None) -> dict:
 
 
 async def create_api_key(tenant_id: str, name: str = "default",
-                         monthly_cap_usd: float | None = None) -> dict:
+                         monthly_cap_usd: float | None = None,
+                         scopes: list[str] | None = None) -> dict:
+    scopes = [sc for sc in (scopes or ["chat"]) if sc in VALID_SCOPES] or ["chat"]
     raw, hashed = generate_key()
     kid = uuid.uuid4().hex
     async with await db.get_conn() as conn:
         await conn.execute(
-            "INSERT INTO api_keys (id, tenant_id, name, key_hash, key_prefix, monthly_cap_usd) "
-            "VALUES (%s, %s, %s, %s, %s, %s)",
-            (kid, tenant_id, name, hashed, raw[:12], monthly_cap_usd),
+            "INSERT INTO api_keys (id, tenant_id, name, key_hash, key_prefix, monthly_cap_usd, scopes) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+            (kid, tenant_id, name, hashed, raw[:12], monthly_cap_usd, scopes),
         )
         await conn.commit()
-    return {"id": kid, "key": raw, "prefix": raw[:12], "name": name}
+    return {"id": kid, "key": raw, "prefix": raw[:12], "name": name, "scopes": scopes}
 
 
 async def set_provider_key(tenant_id: str, provider: str, plaintext: str) -> None:
@@ -126,7 +136,7 @@ async def resolve(raw_key: str) -> TenantContext | None:
     """API key -> tenant context, or None if unknown/revoked."""
     async with await db.get_conn() as conn:
         row = await conn.execute(
-            "SELECT id, tenant_id, monthly_cap_usd FROM api_keys "
+            "SELECT id, tenant_id, monthly_cap_usd, scopes FROM api_keys "
             "WHERE key_hash = %s AND revoked_at IS NULL",
             (hash_key(raw_key),),
         )
@@ -143,6 +153,7 @@ async def resolve(raw_key: str) -> TenantContext | None:
         tenant_id=key[1], key_id=key[0],
         monthly_cap_usd=float(key[2]) if key[2] is not None else None,
         provider_keys={p: f.decrypt(ct.encode()).decode() for p, ct in provider_rows} if f else {},
+        scopes=tuple(key[3]) if key[3] else ("chat",),
     )
 
 
@@ -158,14 +169,15 @@ async def budget_exceeded(ctx: TenantContext) -> bool:
 async def list_api_keys(tenant_id: str) -> list[dict]:
     async with await db.get_conn() as conn:
         rows = await conn.execute(
-            "SELECT id, key_prefix AS prefix, name, created_at, monthly_cap_usd FROM api_keys "
+            "SELECT id, key_prefix AS prefix, name, created_at, monthly_cap_usd, scopes FROM api_keys "
             "WHERE tenant_id = %s AND revoked_at IS NULL ORDER BY created_at DESC",
             (tenant_id,),
         )
         fetched = await rows.fetchall()
     return [
         {"id": r[0], "prefix": r[1], "name": r[2],
-         "created_at": r[3].isoformat(), "monthly_cap_usd": float(r[4]) if r[4] is not None else None}
+         "created_at": r[3].isoformat(), "monthly_cap_usd": float(r[4]) if r[4] is not None else None,
+         "scopes": list(r[5]) if r[5] else ["chat"]}
         for r in fetched
     ]
 

@@ -28,6 +28,7 @@ class KeyIn(BaseModel):
     tenant_id: str
     name: str = Field(default="default", max_length=128)
     monthly_cap_usd: float | None = None
+    scopes: list[str] | None = None  # subset of {"chat", "metrics"}; default ["chat"]
 
 
 class ProviderKeyIn(BaseModel):
@@ -46,7 +47,7 @@ async def upsert_tenant(body: TenantIn, request: Request):
 async def create_key(body: KeyIn, request: Request):
     _authorize(request)
     # the raw key is returned once, here; only its hash is stored
-    return await tenancy.create_api_key(body.tenant_id, body.name, body.monthly_cap_usd)
+    return await tenancy.create_api_key(body.tenant_id, body.name, body.monthly_cap_usd, body.scopes)
 
 
 @router.get("/admin/keys")

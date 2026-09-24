@@ -59,6 +59,9 @@ async def _authenticate(request: Request):
     if await tenancy.budget_exceeded(ctx):
         return None, JSONResponse(status_code=402, content={
             "error": {"message": "monthly budget cap reached", "type": "budget_exceeded"}})
+    if not ctx.has_scope("chat"):
+        return None, JSONResponse(status_code=403, content={
+            "error": {"message": "key lacks the chat scope", "type": "insufficient_scope"}})
     return ctx, None
 
 
@@ -105,6 +108,28 @@ async def _run_pipeline(req: ChatRequest):
             d["name"] = m.name
         messages.append(d)
     return messages, lane, model_alias, None
+
+
+@router.get("/v1/usage")
+async def usage(request: Request):
+    """Tenant-scoped usage: this month's recorded spend vs the key's cap.
+    Requires a key with the metrics scope (RBAC)."""
+    if not get_settings().tenancy_enabled:
+        return JSONResponse(status_code=404, content={"error": {"message": "tenancy disabled"}})
+    auth = request.headers.get("authorization", "")
+    raw = auth[7:] if auth.lower().startswith("bearer ") else ""
+    ctx = await tenancy.resolve(raw) if raw else None
+    if ctx is None:
+        return JSONResponse(status_code=401, content={
+            "error": {"message": "missing or invalid API key", "type": "auth_error"}})
+    if not ctx.has_scope("metrics"):
+        return JSONResponse(status_code=403, content={
+            "error": {"message": "key lacks the metrics scope", "type": "insufficient_scope"}})
+    spent = await store.monthly_spend(ctx.key_id)
+    return {"key_id": ctx.key_id, "month_spend_usd": round(spent, 6),
+            "monthly_cap_usd": ctx.monthly_cap_usd,
+            "remaining_usd": (round(ctx.monthly_cap_usd - spent, 6)
+                              if ctx.monthly_cap_usd is not None else None)}
 
 
 @router.post("/v1/chat/completions")

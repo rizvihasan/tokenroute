@@ -58,6 +58,8 @@ async def chat(req: ChatRequest, request: Request):
             raise HTTPException(status_code=401, detail="invalid or missing API key")
         if await tenancy.budget_exceeded(ctx):
             raise HTTPException(status_code=402, detail="monthly budget cap reached")
+        if not ctx.has_scope("chat"):
+            raise HTTPException(status_code=403, detail="key lacks the chat scope")
         tenant_keys = ctx.provider_keys
         key_id = ctx.key_id
 

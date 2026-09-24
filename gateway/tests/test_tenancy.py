@@ -66,3 +66,37 @@ def test_chat_endpoint_requires_key_when_enabled():
         resp = client.post("/chat", json={
             "messages": [{"role": "user", "content": "hi"}]})
     assert resp.status_code == 401
+
+
+def test_chat_scope_enforced():
+    from app.services import tenancy as t
+    ctx = t.TenantContext(tenant_id="t1", key_id="k1", scopes=("metrics",))
+    with patch("app.routers.openai_compat.get_settings", return_value=_settings()), \
+         patch("app.routers.openai_compat.tenancy.resolve", AsyncMock(return_value=ctx)), \
+         patch("app.routers.openai_compat.tenancy.budget_exceeded", AsyncMock(return_value=False)):
+        resp = client.post("/v1/chat/completions", json={
+            "model": "auto", "messages": [{"role": "user", "content": "hi"}]},
+            headers={"authorization": "Bearer tr_x"})
+    assert resp.status_code == 403
+    assert resp.json()["error"]["type"] == "insufficient_scope"
+
+
+def test_usage_endpoint_metrics_scope():
+    from app.services import tenancy as t
+    ctx = t.TenantContext(tenant_id="t1", key_id="k1", scopes=("metrics",), monthly_cap_usd=5.0)
+    with patch("app.routers.openai_compat.get_settings", return_value=_settings()), \
+         patch("app.routers.openai_compat.tenancy.resolve", AsyncMock(return_value=ctx)), \
+         patch("app.routers.openai_compat.store.monthly_spend", AsyncMock(return_value=1.25)):
+        resp = client.get("/v1/usage", headers={"authorization": "Bearer tr_x"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["month_spend_usd"] == 1.25 and body["remaining_usd"] == 3.75
+
+
+def test_usage_endpoint_rejects_chat_only_key():
+    from app.services import tenancy as t
+    ctx = t.TenantContext(tenant_id="t1", key_id="k1", scopes=("chat",))
+    with patch("app.routers.openai_compat.get_settings", return_value=_settings()), \
+         patch("app.routers.openai_compat.tenancy.resolve", AsyncMock(return_value=ctx)):
+        resp = client.get("/v1/usage", headers={"authorization": "Bearer tr_x"})
+    assert resp.status_code == 403
