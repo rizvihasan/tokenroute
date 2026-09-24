@@ -89,6 +89,10 @@ async def _stream_once(
     """Stream one attempt against the alias's provider. Raises httpx.HTTPError
     on transport failure; yields {'error'} on a non-200 before any token."""
     base, key, model = _chat_provider(alias, keys)
+    if not key:
+        yield {"error": f"no API key configured for provider of {alias!r} "
+                        "(set the platform env key or add a BYOK key)"}
+        return
     payload = {
         "model": model,
         "messages": messages,
