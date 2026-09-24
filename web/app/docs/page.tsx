@@ -48,13 +48,16 @@ client.chat.completions.create(
           <li>Semantic cache: paraphrased repeat questions answered for $0 (similarity threshold 0.92).</li>
           <li>Fallback: a failed lane retries on the other lane before erroring.</li>
           <li>Live analytics: per-request cost, latency, cache hits on the Analytics page.</li>
+          <li>Function calling: pass <code>tools</code>/<code>tool_choice</code>; <code>tool_calls</code> stream back, tool-result messages work.</li>
+          <li>Guardrails: injection filter + card-number redaction (hosted: log mode).</li>
+          <li>MCP: POST /mcp with your key - <code>tokenroute_chat</code>, <code>tokenroute_usage</code> (metrics scope) for Claude/Cursor.</li>
         </ul>
       </section>
 
       <section className="flex flex-col gap-2">
         <h2 className="font-medium">Errors</h2>
         <ul className="text-sm text-muted list-disc pl-5 flex flex-col gap-1">
-          <li><code>401</code> missing/revoked key - <code>402</code> monthly budget cap reached - <code>429</code> rate limited.</li>
+          <li><code>401</code> missing/revoked key - <code>402</code> monthly budget cap reached - <code>403</code> key lacks the scope - <code>429</code> rate limited.</li>
           <li>First call after 15 min idle can take ~30-60s (free-tier cold start).</li>
         </ul>
       </section>
