@@ -4,7 +4,7 @@ from fastapi import FastAPI
 
 from .config import get_settings
 
-from .routers import admin, chat, evals, ingest, metrics, openai_compat
+from .routers import admin, chat, evals, ingest, mcp, metrics, openai_compat
 from .services import db, tenancy
 
 
@@ -27,6 +27,7 @@ app.include_router(ingest.router)
 app.include_router(evals.router)
 app.include_router(metrics.router)
 app.include_router(admin.router)
+app.include_router(mcp.router)
 
 
 @app.get("/healthz")
