@@ -9,3 +9,4 @@ psycopg[binary]==3.2.*
 pgvector==0.3.*
 numpy==1.26.*
 pytest==8.*
+cryptography==43.*

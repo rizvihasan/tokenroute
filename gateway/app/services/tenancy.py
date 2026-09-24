@@ -151,3 +151,28 @@ async def budget_exceeded(ctx: TenantContext) -> bool:
     from . import store  # redis counters live there
     spent = await store.monthly_spend(ctx.key_id)
     return spent >= ctx.monthly_cap_usd
+
+
+async def list_api_keys(tenant_id: str) -> list[dict]:
+    async with await db.get_conn() as conn:
+        rows = await conn.execute(
+            "SELECT id, prefix, name, created_at, monthly_cap_usd FROM api_keys "
+            "WHERE tenant_id = %s AND revoked_at IS NULL ORDER BY created_at DESC",
+            (tenant_id,),
+        )
+        fetched = await rows.fetchall()
+    return [
+        {"id": r[0], "prefix": r[1], "name": r[2],
+         "created_at": r[3].isoformat(), "monthly_cap_usd": float(r[4]) if r[4] is not None else None}
+        for r in fetched
+    ]
+
+
+async def revoke_api_key(key_id: str) -> bool:
+    async with await db.get_conn() as conn:
+        cur = await conn.execute(
+            "UPDATE api_keys SET revoked_at = now() WHERE id = %s AND revoked_at IS NULL",
+            (key_id,),
+        )
+        await conn.commit()
+        return cur.rowcount > 0

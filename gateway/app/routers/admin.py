@@ -49,6 +49,22 @@ async def create_key(body: KeyIn, request: Request):
     return await tenancy.create_api_key(body.tenant_id, body.name, body.monthly_cap_usd)
 
 
+@router.get("/admin/keys")
+async def list_keys(tenant_id: str, request: Request):
+    _authorize(request)
+    return await tenancy.list_api_keys(tenant_id)
+
+
+@router.post("/admin/keys/revoke")
+async def revoke_key(request: Request):
+    _authorize(request)
+    body = await request.json()
+    ok = await tenancy.revoke_api_key(str(body.get("key_id", "")))
+    if not ok:
+        raise HTTPException(status_code=404, detail="key not found or already revoked")
+    return {"ok": True}
+
+
 @router.post("/admin/provider-keys")
 async def set_provider_key(body: ProviderKeyIn, request: Request):
     _authorize(request)
