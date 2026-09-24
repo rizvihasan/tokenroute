@@ -9,7 +9,7 @@ client = TestClient(app)
 
 
 def _patch_pipeline(monkeypatch, events):
-    async def fake_stream(messages, alias, keys=None):
+    async def fake_stream(*_a, **_kw):
         for e in events:
             yield e
 
@@ -64,3 +64,42 @@ def test_rate_limit_returns_429(monkeypatch):
         "model": "auto", "messages": [{"role": "user", "content": "hi"}],
     })
     assert resp.status_code == 429
+
+
+def test_tool_calls_merge_non_streaming(monkeypatch):
+    _patch_pipeline(monkeypatch, [
+        {"tool_calls": [{"index": 0, "id": "call_1", "function": {"name": "get_weather", "arguments": ""}}]},
+        {"tool_calls": [{"index": 0, "function": {"arguments": '{"city": "Mum'}}]},
+        {"tool_calls": [{"index": 0, "function": {"arguments": 'bai"}'}}]},
+        {"finish": "tool_calls"},
+        {"usage": {"prompt_tokens": 5, "completion_tokens": 3, "total_tokens": 8}},
+    ])
+    resp = client.post("/v1/chat/completions", json={
+        "model": "auto",
+        "messages": [{"role": "user", "content": "weather in mumbai?"}],
+        "tools": [{"type": "function", "function": {"name": "get_weather",
+                  "parameters": {"type": "object", "properties": {"city": {"type": "string"}}}}}],
+    })
+    assert resp.status_code == 200
+    choice = resp.json()["choices"][0]
+    assert choice["finish_reason"] == "tool_calls"
+    tcs = choice["message"]["tool_calls"]
+    assert tcs[0]["id"] == "call_1"
+    assert tcs[0]["function"]["name"] == "get_weather"
+    assert tcs[0]["function"]["arguments"] == '{"city": "Mumbai"}'
+
+
+def test_tool_result_role_accepted(monkeypatch):
+    _patch_pipeline(monkeypatch, [{"token": "sunny"}, {"usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}}])
+    resp = client.post("/v1/chat/completions", json={
+        "model": "auto",
+        "messages": [
+            {"role": "user", "content": "weather?"},
+            {"role": "assistant", "content": None,
+             "tool_calls": [{"id": "call_1", "type": "function",
+                             "function": {"name": "get_weather", "arguments": "{}"}}]},
+            {"role": "tool", "tool_call_id": "call_1", "content": "sunny, 34C"},
+        ],
+    })
+    assert resp.status_code == 200
+    assert resp.json()["choices"][0]["message"]["content"] == "sunny"

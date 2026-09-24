@@ -93,8 +93,17 @@ async def _run_pipeline(req: ChatRequest):
 
     system = SYSTEM_TEMPLATE.format(context=ctx_text) if ctx_text else SYSTEM_PLAIN
     messages = [{"role": "system", "content": system}]
-    messages += [{"role": m.role, "content": m.content} for m in req.messages
-                 if m.role != "system"]
+    for m in req.messages:
+        if m.role == "system":
+            continue
+        d: dict = {"role": m.role, "content": m.content}
+        if m.tool_calls:
+            d["tool_calls"] = m.tool_calls
+        if m.tool_call_id:
+            d["tool_call_id"] = m.tool_call_id
+        if m.name:
+            d["name"] = m.name
+        messages.append(d)
     return messages, lane, model_alias, None
 
 
@@ -105,6 +114,8 @@ async def chat_completions(payload: dict, request: Request):
     if not raw_messages:
         return JSONResponse(status_code=400, content={"error": {"message": "messages required"}})
     stream = bool(payload.get("stream"))
+    tools = payload.get("tools") or None
+    tool_choice = payload.get("tool_choice")
     model_req = str(payload.get("model") or "auto")
     force = None
     if model_req == settings.lane_local_alias:
@@ -125,9 +136,14 @@ async def chat_completions(payload: dict, request: Request):
 
     req = ChatRequest(
         conversation_id=f"v1-{client_ip}",
-        messages=[ChatMessage(role=m["role"], content=m["content"]) for m in raw_messages
-                  if m.get("role") in ("system", "user", "assistant")],
+        messages=[ChatMessage(role=m["role"], content=m.get("content") or "",
+                              tool_calls=m.get("tool_calls"),
+                              tool_call_id=m.get("tool_call_id"),
+                              name=m.get("name")) for m in raw_messages
+                  if m.get("role") in ("system", "user", "assistant", "tool")],
         force_lane=force,  # type: ignore[arg-type]
+        # a cached text answer is never a valid reply to a tool call
+        use_cache=not tools,
     )
     prompt = next((m.content for m in reversed(req.messages) if m.role == "user"), "")
     messages, lane, model_alias, cached = await _run_pipeline(req)
@@ -146,12 +162,19 @@ async def chat_completions(payload: dict, request: Request):
         collected: list[str] = []
         usage: dict = {}
         error: str | None = None
-        async for event in llm.stream_chat(messages, model_alias, keys):
+        finish = "stop"
+        async for event in llm.stream_chat(messages, model_alias, keys, tools, tool_choice):
             if "error" in event:
                 error = event["error"]
                 break
             if "usage" in event:
                 usage = event["usage"]
+                continue
+            if "finish" in event:
+                finish = event["finish"]
+                continue
+            if "tool_calls" in event:
+                yield _sse(_chunk(cid, model_alias, {"tool_calls": event["tool_calls"]}))
                 continue
             collected.append(event["token"])
             yield _sse(_chunk(cid, model_alias, {"content": event["token"]}))
@@ -159,7 +182,7 @@ async def chat_completions(payload: dict, request: Request):
             yield _sse({"error": {"message": error, "type": "upstream_error"}})
             yield "data: [DONE]\n\n"
             return
-        final = _chunk(cid, model_alias, {}, "stop")
+        final = _chunk(cid, model_alias, {}, finish)
         if usage:
             final["usage"] = {
                 "prompt_tokens": usage.get("prompt_tokens", 0),
@@ -185,7 +208,7 @@ async def chat_completions(payload: dict, request: Request):
         })
         if ctx is not None:
             await store.record_spend(ctx.key_id, cost)
-        if text:
+        if text and not tools:
             try:
                 await cache.save(prompt, text, model_alias)
             except Exception:
@@ -205,16 +228,34 @@ async def chat_completions(payload: dict, request: Request):
         })
     collected: list[str] = []
     usage = {}
-    async for event in llm.stream_chat(messages, model_alias, keys):
+    finish = "stop"
+    tc_acc: dict[int, dict] = {}
+    async for event in llm.stream_chat(messages, model_alias, keys, tools, tool_choice):
         if "error" in event:
             return JSONResponse(status_code=502,
                                 content={"error": {"message": event["error"], "type": "upstream_error"}})
         if "usage" in event:
             usage = event["usage"]
             continue
+        if "finish" in event:
+            finish = event["finish"]
+            continue
+        if "tool_calls" in event:
+            for tc in event["tool_calls"]:
+                idx = tc.get("index", 0)
+                slot = tc_acc.setdefault(idx, {"id": "", "type": "function",
+                                             "function": {"name": "", "arguments": ""}})
+                if tc.get("id"):
+                    slot["id"] = tc["id"]
+                fn = tc.get("function") or {}
+                if fn.get("name"):
+                    slot["function"]["name"] += fn["name"]
+                if fn.get("arguments"):
+                    slot["function"]["arguments"] += fn["arguments"]
+            continue
         collected.append(event["token"])
     text = "".join(collected)
-    if text:
+    if text and not tools:
         try:
             await cache.save(prompt, text, model_alias)
         except Exception:
@@ -222,8 +263,10 @@ async def chat_completions(payload: dict, request: Request):
     return JSONResponse({
         "id": cid, "object": "chat.completion", "created": int(time.time()),
         "model": model_alias,
-        "choices": [{"index": 0, "finish_reason": "stop",
-                     "message": {"role": "assistant", "content": text}}],
+        "choices": [{"index": 0,
+                     "finish_reason": "tool_calls" if tc_acc else finish,
+                     "message": {"role": "assistant", "content": text or None,
+                                 **({"tool_calls": [tc_acc[i] for i in sorted(tc_acc)]} if tc_acc else {})}}],
         "usage": {
             "prompt_tokens": int(usage.get("prompt_tokens", 0)),
             "completion_tokens": int(usage.get("completion_tokens", 0)),

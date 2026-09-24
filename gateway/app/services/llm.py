@@ -84,7 +84,8 @@ async def embed(texts: list[str], keys: dict | None = None) -> list[list[float]]
 
 
 async def _stream_once(
-    messages: list[dict], alias: str, keys: dict | None = None
+    messages: list[dict], alias: str, keys: dict | None = None,
+    tools: list[dict] | None = None, tool_choice=None,
 ) -> AsyncIterator[dict]:
     """Stream one attempt against the alias's provider. Raises httpx.HTTPError
     on transport failure; yields {'error'} on a non-200 before any token."""
@@ -99,6 +100,10 @@ async def _stream_once(
         "stream": True,
         "stream_options": {"include_usage": True},
     }
+    if tools:
+        payload["tools"] = tools
+        if tool_choice is not None:
+            payload["tool_choice"] = tool_choice
     async with httpx.AsyncClient(base_url=base, timeout=180) as client:
         async with client.stream(
             "POST",
@@ -126,11 +131,16 @@ async def _stream_once(
                     token = delta.get("content")
                     if token:
                         yield {"token": token}
+                    if delta.get("tool_calls"):
+                        yield {"tool_calls": delta["tool_calls"]}
+                    if choices[0].get("finish_reason"):
+                        yield {"finish": choices[0]["finish_reason"]}
                 if event.get("usage"):
                     yield {"usage": event["usage"]}
 
 
-async def stream_chat(messages: list[dict], model_alias: str, keys: dict | None = None) -> AsyncIterator[dict]:
+async def stream_chat(messages: list[dict], model_alias: str, keys: dict | None = None,
+                      tools: list[dict] | None = None, tool_choice=None) -> AsyncIterator[dict]:
     """Yield {'token'} / {'usage'} / {'error'} events.
 
     Fallback (previously LiteLLM's router_settings.fallbacks): if the chosen
@@ -151,7 +161,7 @@ async def stream_chat(messages: list[dict], model_alias: str, keys: dict | None 
     for alias in aliases:
         yielded_token = False
         try:
-            async for event in _stream_once(messages, alias, keys):
+            async for event in _stream_once(messages, alias, keys, tools, tool_choice):
                 if "error" in event and not yielded_token:
                     last_error = event["error"]
                     break  # clean pre-token refusal: try the fallback lane
@@ -170,14 +180,17 @@ async def stream_chat(messages: list[dict], model_alias: str, keys: dict | None 
     yield {"error": last_error}
 
 
-async def complete_chat(messages: list[dict], model_alias: str, keys: dict | None = None) -> dict:
+async def complete_chat(messages: list[dict], model_alias: str, keys: dict | None = None,
+                        tools: list[dict] | None = None, tool_choice=None) -> dict:
     """Non-streaming completion, used by the eval runner."""
     base, key, model = _chat_provider(model_alias, keys)
     async with httpx.AsyncClient(base_url=base, timeout=180) as client:
         resp = await client.post(
             "/chat/completions",
             headers={"Authorization": f"Bearer {key}"},
-            json={"model": model, "messages": messages},
+            json={"model": model, "messages": messages,
+                  **({"tools": tools} if tools else {}),
+                  **({"tool_choice": tool_choice} if tool_choice is not None else {})},
         )
         resp.raise_for_status()
         return resp.json()
