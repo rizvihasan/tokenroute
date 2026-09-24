@@ -102,15 +102,15 @@ export function Chat() {
               </div>
               <div>
                 <h1 className="text-2xl font-semibold tracking-tight text-slate-100 sm:text-4xl">
-                  Easy prompts don't deserve{" "}
-                  <span className="text-accent">premium prices.</span>
+                  The gateway between your app{" "}
+                  <span className="text-accent">and every LLM.</span>
                 </h1>
                 <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-muted sm:text-[15px]">
-                  TokenRoute is one OpenAI-compatible endpoint that reads every request,
-                  sends the easy ones down the cheap lane and the hard ones to the heavy
-                  hitters - then answers repeat questions from a semantic cache for $0.
-                  Every call reports its lane, latency, and cost. Ask something, then ask
-                  it again in different words.
+                  One endpoint, any provider. TokenRoute classifies each prompt by
+                  complexity, routes it to the cheapest lane that can answer it well,
+                  serves repeats from a semantic cache, and falls back across providers
+                  automatically. Lane, latency, and cost are reported on every request.
+                  Works with the SDK you already use.
                 </p>
               </div>
             </div>
@@ -127,9 +127,9 @@ export function Chat() {
             </div>
             <div className="flex flex-wrap items-center justify-center gap-2">
               <Badge variant="accent">semantic cache</Badge>
-              <Badge variant="muted">cost-aware routing</Badge>
-              <Badge variant="muted">rag built in</Badge>
-              <Badge variant="muted">live cost per call</Badge>
+              <Badge variant="muted">complexity routing</Badge>
+              <Badge variant="muted">provider fallback</Badge>
+              <Badge variant="muted">per-request cost</Badge>
             </div>
           </div>
         ) : (
@@ -170,7 +170,7 @@ export function Chat() {
       <div className="pb-4 pt-1">
         <Composer onSend={send} disabled={streaming} />
         <p className="mt-2 text-center text-[11px] text-faint">
-          Free demo on a $5/month cap - Enter to send, Shift+Enter for a newline
+          Hosted demo, $5/month cap - Enter to send, Shift+Enter for a newline
         </p>
       </div>
     </div>

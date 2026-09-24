@@ -50,8 +50,8 @@ export default function DocsPage() {
         <div className="mb-8">
           <h1 className="text-xl font-semibold tracking-tight text-slate-100 sm:text-2xl">Docs</h1>
           <p className="mt-1 text-sm text-muted">
-            Everything below runs against the hosted gateway, right now. Prefer your own
-            metal? TokenRoute is free and open source (Apache 2.0):{" "}
+            Everything below runs against the hosted gateway. TokenRoute is also free and
+            open source (Apache 2.0) if you want to self-host:{" "}
             <a href="https://github.com/rizvihasan/tokenroute" target="_blank" rel="noreferrer" className="text-accent hover:underline">
               github.com/rizvihasan/tokenroute
             </a>
@@ -61,10 +61,9 @@ export default function DocsPage() {
         <div className="flex flex-col gap-8">
           <Section id="get-a-key" title="1. Get a key">
             <p>
-              Sign in with Google on the API Keys page and mint a key in seconds. Add a monthly
-              spend cap if you want a hard stop - the gateway answers 402 the moment you hit it,
-              never a surprise invoice. Prefer your own provider key? BYOK bills usage straight
-              to your provider account.
+              Sign in with Google on the API Keys page and create a key. Set a monthly spend
+              cap for a hard stop - the gateway returns 402 when you reach it. With BYOK,
+              usage bills to your own provider account instead.
             </p>
           </Section>
 
@@ -102,7 +101,7 @@ export default function DocsPage() {
                 {code({ children: "401" })} missing/revoked key - {code({ children: "402" })} monthly budget cap reached -{" "}
                 {code({ children: "403" })} key lacks the scope - {code({ children: "429" })} rate limited.
               </li>
-              <li>First call after 15 quiet minutes can take ~30-60s - the free tier naps.</li>
+              <li>First call after 15 minutes idle can take ~30-60s (free-tier cold start).</li>
             </ul>
           </Section>
         </div>

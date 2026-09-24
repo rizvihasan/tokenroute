@@ -78,7 +78,7 @@ export default async function DashboardPage({
       {searchParams.newkey && (
         <div className="animate-fade-up rounded-xl border border-accent/40 bg-accent/5 p-4 sm:p-5 shadow-glow">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm font-semibold text-accent">Your new key, shown exactly once. Copy it now - we can never show it again.</p>
+            <p className="text-sm font-semibold text-accent">Key created. Copy it now - it is shown only once.</p>
             <CopyButton text={searchParams.newkey} label="Copy key" />
           </div>
           <code className="mt-3 block break-all rounded-lg border border-accent/20 bg-ink px-3 py-2.5 font-mono text-sm text-accent">
@@ -127,7 +127,7 @@ export default async function DashboardPage({
                 </tr>
               ))}
               {keys.length === 0 && (
-                <tr><td colSpan={6} className="px-5 py-8 text-center text-sm text-muted">No keys yet - your first one is seconds away, below.</td></tr>
+                <tr><td colSpan={6} className="px-5 py-8 text-center text-sm text-muted">No keys yet - create one below.</td></tr>
               )}
             </tbody>
           </table>
@@ -135,7 +135,7 @@ export default async function DashboardPage({
       </Card>
 
       <Card>
-        <CardHeader title="New key" description="Keys appear once, at the moment of creation. Store them somewhere safe." />
+        <CardHeader title="New key" description="New keys are shown once, at creation." />
         <CardContent>
           <form action={createKeyAction} className="flex flex-wrap items-end gap-4">
             <Field label="Name" className="w-full sm:w-44">
@@ -163,7 +163,7 @@ export default async function DashboardPage({
       <Card>
         <CardHeader
           title="Billing"
-          description="Free includes $5/month of platform usage. Pro lifts the cap to $50/month, with your budget guardrails intact."
+          description="Free includes $5/month of platform usage. Pro raises the cap to $50/month. Key-level spend caps apply on both."
         />
         <CardContent>
           <p className="text-sm text-muted">
@@ -171,7 +171,7 @@ export default async function DashboardPage({
             {billing.status !== "active" ? ` (${billing.status})` : ""}
           </p>
           {searchParams.billing === "unconfigured" && (
-            <p className="mt-2 text-sm text-amber-300">Payments aren't switched on yet - checkout opens the moment the provider account is connected.</p>
+            <p className="mt-2 text-sm text-amber-300">Payments are not configured yet - checkout activates when the provider account is connected.</p>
           )}
           {billing.plan === "free" && (
             <form action={upgradeAction} className="mt-3">
@@ -184,7 +184,7 @@ export default async function DashboardPage({
       <Card>
         <CardHeader
           title="Bring your own keys (BYOK)"
-          description="Plug in your own Groq, OpenAI, or Gemini key and calls bill straight to your provider account - not to us. Encrypted at rest; your spend cap still applies as a safety net."
+          description="Add your own Groq, OpenAI, or Gemini key and usage bills directly to your provider account. Keys are encrypted at rest; your spend cap still applies."
         />
         <CardContent>
           <form action={byokAction} className="flex flex-wrap items-end gap-4">

@@ -14,8 +14,8 @@ export default function LoginPage() {
             Sign in to TokenRoute
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-muted">
-            One Google account gets you a tenant, API keys, and budget guardrails.
-            No passwords, no credit card, no sales call.
+            One Google account gets you a tenant, API keys, and spend caps.
+            No password or credit card required.
           </p>
         </div>
         <form
@@ -41,7 +41,7 @@ export default function LoginPage() {
         <div className="mt-6 flex flex-wrap items-center justify-center gap-1.5">
           <Badge variant="muted">free tier</Badge>
           <Badge variant="muted">$5/month cap included</Badge>
-          <Badge variant="muted">bring your own keys</Badge>
+          <Badge variant="muted">byok</Badge>
         </div>
       </div>
     </div>

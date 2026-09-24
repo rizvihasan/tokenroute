@@ -44,7 +44,7 @@ function LaneSplit({ payload }: { payload: ConsolePayload }) {
   ];
   return (
     <Card>
-      <CardHeader title="Where requests went" description="Cheap lane, strong lane, or free cache" />
+      <CardHeader title="Lane distribution" description="Requests by serving lane" />
       <CardContent>
         <div className="flex h-3 w-full overflow-hidden rounded-full bg-ink" role="img" aria-label={`Lane split: ${rows.map(({ lane, n }) => `${lane} ${Math.round((n / total) * 100)} percent`).join(", ")}`}>
           {rows.map(({ lane, n }) =>
@@ -94,7 +94,7 @@ function TtftHistogram({ events }: { events: RequestEvent[] }) {
   const peak = Math.max(...counts, 1);
   return (
     <Card>
-      <CardHeader title="Time to first token" description={`How fast answers start - ${ttfts.length} generations in window`} />
+      <CardHeader title="Time to first token" description={`First-token latency across ${ttfts.length} generations`} />
       <CardContent>
         <div className="flex h-28 items-end gap-1.5">
           {counts.map((c, i) => (
@@ -119,7 +119,7 @@ function RequestFeed({ events }: { events: RequestEvent[] }) {
   if (!events.length) return null;
   return (
     <Card className="overflow-hidden">
-      <CardHeader title="Live request feed" description="The most recent requests, as they happened" />
+      <CardHeader title="Request feed" description="Most recent requests across all lanes" />
       <div className="max-h-[26rem] overflow-auto">
         <div className="min-w-[640px]">
           {events.slice(0, 25).map((e, i) => (
@@ -222,7 +222,7 @@ export function ConsoleDashboard() {
         <Card>
           <CardContent className="py-10 text-center">
             <p className="text-sm text-muted">
-              Quiet so far. Send a message in the Playground and watch it land here in real time.
+              No requests yet. Send a message in the Playground and it appears here in real time.
             </p>
           </CardContent>
         </Card>
@@ -239,7 +239,7 @@ export function ConsoleDashboard() {
             <MetricCard
               label="Cache hit rate"
               value={`${Math.round(s.cache_hit_rate * 100)}%`}
-              hint={`${s.cache_hits} answers served free - avg sim ${s.avg_similarity_on_hits.toFixed(2)}`}
+              hint={`${s.cache_hits} served from cache - avg similarity ${s.avg_similarity_on_hits.toFixed(2)}`}
             />
             <MetricCard label="Avg TTFT" value={fmtMs(s.ttft_avg_ms)} hint={`p50 ${fmtMs(s.ttft_p50_ms)}`} />
             <MetricCard label="p95 TTFT" value={fmtMs(s.ttft_p95_ms)} hint="across generations" />
@@ -251,7 +251,7 @@ export function ConsoleDashboard() {
             <MetricCard
               label="Estimated spend"
               value={`$${s.cost_usd.toFixed(4)}`}
-              hint="at list prices - the free tier covers it"
+              hint="at Groq list prices"
             />
           </div>
 
@@ -266,8 +266,8 @@ export function ConsoleDashboard() {
 
       <Card>
         <CardHeader
-          title="Quality evals (Ragas)"
-          description="Answer-quality scores for the live model lineup"
+          title="Evaluations (Ragas)"
+          description="Answer-quality scores for the current model lineup"
           action={
             <div className="flex items-center gap-2">
               {evalStatus && <span className="text-xs text-muted">{evalStatus}</span>}
@@ -289,7 +289,7 @@ export function ConsoleDashboard() {
               ))}
             </div>
           ) : (
-            <div className="text-sm text-muted">No eval runs yet - kick one off to score the current lineup.</div>
+            <div className="text-sm text-muted">No eval runs yet.</div>
           )}
         </CardContent>
       </Card>
