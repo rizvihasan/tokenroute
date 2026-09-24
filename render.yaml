@@ -38,7 +38,7 @@ services:
         sync: false
       - key: EMBEDDING_DIM # jina-embeddings-v3
         value: "1024"
-      - key: CLOUD_INPUT_COST_PER_MTOK # Groq llama-3.3-70b list prices, so the
-        value: "0.59" # console shows notional cost even on the free tier
+      - key: CLOUD_INPUT_COST_PER_MTOK # Groq gpt-oss-120b list prices, so the
+        value: "0.15" # console shows notional cost even on the free tier
       - key: CLOUD_OUTPUT_COST_PER_MTOK
-        value: "0.79"
+        value: "0.60"

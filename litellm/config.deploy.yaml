@@ -1,17 +1,19 @@
 # Hosted-demo model config. Same aliases as the local stack, so application
 # code is unchanged; providers swap underneath:
-#   chat-local  -> Groq hosted Llama 3.1 8B (cheap lane, was local Ollama)
-#   chat-cloud  -> Groq Llama 3.3 70B (escalation lane; swap for gpt-4o-mini
+#   chat-local  -> Groq hosted gpt-oss-20b (cheap lane, was local Ollama)
+#   chat-cloud  -> Groq gpt-oss-120b (escalation lane; swap for gpt-4o-mini
 #                  by setting model back and providing OPENAI_API_KEY)
+# (Groq moved the Llama 3.x models to enterprise-only in 2026; gpt-oss is
+#  the current free-tier family.)
 #   embed-local -> Jina embeddings v3 (OpenAI-compatible)
 model_list:
   - model_name: chat-local
     litellm_params:
-      model: groq/llama-3.1-8b-instant
+      model: groq/openai/gpt-oss-20b
       api_key: os.environ/GROQ_API_KEY
   - model_name: chat-cloud
     litellm_params:
-      model: groq/llama-3.3-70b-versatile
+      model: groq/openai/gpt-oss-120b
       api_key: os.environ/GROQ_API_KEY
   - model_name: embed-local
     litellm_params:

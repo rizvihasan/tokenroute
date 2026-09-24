@@ -128,8 +128,9 @@ The compose stack is the real thing; a hosted demo is wired for free tiers:
 - **litellm** -> Render free web service (Docker, `litellm/Dockerfile` +
   `config.deploy.yaml`)
 - **Redis** -> Upstash free; **Postgres** -> Neon free (pgvector built in)
-- **models** -> Groq (OpenAI-compatible) serves both lanes: `llama-3.1-8b-instant`
-  as the cheap lane and `llama-3.3-70b-versatile` as the escalation lane.
+- **models** -> Groq (OpenAI-compatible) serves both lanes: `openai/gpt-oss-20b`
+  as the cheap lane and `openai/gpt-oss-120b` as the escalation lane. (Groq moved
+  the Llama 3.x models to enterprise-only; gpt-oss is their current free-tier family.)
   Embeddings via Jina v3 (OpenAI-compatible). Set `EMBEDDING_DIM=1024`.
 - `render.yaml` is the blueprint; CI runs in GitHub Actions (`.github/workflows/ci.yml`).
 
