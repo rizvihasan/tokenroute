@@ -7,10 +7,9 @@ import { MessageList, type Message } from "./MessageList";
 import { Badge } from "./ui/badge";
 import { LogoMark } from "./Logo";
 
-const SUGGESTIONS = [
+const EXAMPLES = [
   "Explain semantic caching in one paragraph",
   "Is RAG better than fine-tuning?",
-  "Write a haiku about load balancers",
   "Explain KV caching in transformers simply",
 ];
 
@@ -20,11 +19,9 @@ export function Chat() {
   const [meta, setMeta] = useState<MetaEvent | null>(null);
   const [stats, setStats] = useState<DoneEvent | null>(null);
   const conversationId = useRef(`web-${Math.random().toString(36).slice(2, 10)}`);
-  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    window.scrollTo({ top: document.documentElement.scrollHeight });
   }, [messages]);
 
   const send = useCallback(
@@ -77,7 +74,7 @@ export function Chat() {
           const next = [...prev];
           next[next.length - 1] = {
             role: "assistant",
-            content: `Request failed: ${err instanceof Error ? err.message : String(err)}. The free-tier gateway may be waking up - try again.`,
+            content: `Couldn't reach the gateway (${err instanceof Error ? err.message : String(err)}). The hosted demo sleeps after 15 minutes idle - retry in a few seconds.`,
             error: true,
           };
           return next;
@@ -92,85 +89,93 @@ export function Chat() {
   const empty = messages.length === 0;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain py-6">
-        {empty ? (
-          <div className="flex h-full flex-col items-center justify-center gap-6 animate-fade-up px-2">
-            <div className="flex flex-col items-center gap-4 text-center">
-              <div className="rounded-2xl border border-edge bg-panel p-3.5 shadow-glow">
-                <LogoMark className="h-10 w-10" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-semibold tracking-tight text-slate-100 sm:text-4xl">
-                  The gateway between your app{" "}
-                  <span className="text-accent">and every LLM.</span>
-                </h1>
-                <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-muted sm:text-[15px]">
-                  One endpoint, any provider. TokenRoute classifies each prompt by
-                  complexity, routes it to the cheapest lane that can answer it well,
-                  serves repeats from a semantic cache, and falls back across providers
-                  automatically. Lane, latency, and cost are reported on every request.
-                  Works with the SDK you already use.
-                </p>
-              </div>
+    <div className="flex flex-1 flex-col">
+      {empty ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-8 px-2 py-10">
+          <div className="flex max-w-2xl flex-col items-center gap-5 text-center">
+            <LogoMark className="h-10 w-10" />
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-100 sm:text-4xl">
+              The gateway between your app{" "}
+              <span className="text-accent">and every LLM.</span>
+            </h1>
+            <p className="max-w-xl text-sm leading-relaxed text-muted sm:text-base">
+              One endpoint for every provider. TokenRoute routes each prompt to the
+              cheapest lane that can answer it well, serves repeats from a semantic
+              cache, and reports lane, latency, and cost on every call.
+            </p>
+          </div>
+          <div className="w-full max-w-xl">
+            <div className="mb-2 text-xs font-medium uppercase tracking-wider text-faint">
+              Try an example
             </div>
-            <div className="grid w-full max-w-xl grid-cols-1 gap-2 sm:grid-cols-2">
-              {SUGGESTIONS.map((s) => (
+            <div className="flex flex-col gap-2">
+              {EXAMPLES.map((s) => (
                 <button
                   key={s}
                   onClick={() => send(s)}
-                  className="rounded-xl border border-edge bg-panel px-4 py-3 text-left text-sm text-muted transition-all hover:border-accent/40 hover:bg-panel-2 hover:text-slate-200"
+                  className="group flex items-center justify-between gap-3 rounded-lg border border-edge bg-panel px-4 py-3 text-left text-sm text-slate-300 transition-colors hover:border-edge-strong hover:bg-panel-2"
                 >
                   {s}
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-4 w-4 shrink-0 text-faint transition-colors group-hover:text-accent"
+                    aria-hidden="true"
+                  >
+                    <path d="M5 12h14m-6-6 6 6-6 6" />
+                  </svg>
                 </button>
               ))}
             </div>
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <Badge variant="accent">semantic cache</Badge>
-              <Badge variant="muted">complexity routing</Badge>
-              <Badge variant="muted">provider fallback</Badge>
-              <Badge variant="muted">per-request cost</Badge>
-            </div>
+            <p className="mt-3 text-xs leading-relaxed text-faint">
+              Ask one, then rephrase it and ask again - the second answer comes back
+              from the semantic cache, free.
+            </p>
           </div>
-        ) : (
+        </div>
+      ) : (
+        <div className="py-6">
           <MessageList messages={messages} streaming={streaming} />
-        )}
-      </div>
-
-      {(meta || stats) && (
-        <div className="flex flex-wrap gap-1.5 pb-2">
-          {meta && (
-            <Badge variant={meta.lane === "cache" ? "info" : meta.lane === "cloud" ? "warn" : "success"}>
-              {meta.lane}
-              <span className="font-sans normal-case tracking-normal opacity-80">
-                {meta.model}
-                {meta.similarity ? ` - sim ${meta.similarity.toFixed(2)}` : ""}
-              </span>
-            </Badge>
-          )}
-          {meta?.contexts && meta.contexts.length > 0 && (
-            <Badge variant="accent">rag: {meta.contexts.map((c) => c.doc_id).join(", ")}</Badge>
-          )}
-          {stats &&
-            (meta?.lane === "cache" || stats.tokens_out === 0 ? (
-              <Badge variant="info">served from cache - $0</Badge>
-            ) : (
-              <Badge variant="outline">
-                <span className="font-sans normal-case tracking-normal">
-                  {stats.ttft_ms != null ? `ttft ${Math.round(stats.ttft_ms)}ms - ` : ""}
-                  {stats.tokens_out} tok
-                  {stats.tokens_per_sec ? ` - ${Math.round(stats.tokens_per_sec)} tok/s` : ""}
-                  {` - $${stats.cost_usd.toFixed(6)}`}
-                </span>
-              </Badge>
-            ))}
         </div>
       )}
 
-      <div className="pb-4 pt-1">
+      <div className="sticky bottom-0 mt-auto border-t border-edge/60 bg-ink/95 pb-4 pt-3 backdrop-blur-sm">
+        {(meta || stats) && (
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {meta && (
+              <Badge variant={meta.lane === "cache" ? "info" : meta.lane === "cloud" ? "warn" : "success"}>
+                {meta.lane}
+                <span className="font-sans normal-case tracking-normal opacity-80">
+                  {meta.model}
+                  {meta.similarity ? ` - sim ${meta.similarity.toFixed(2)}` : ""}
+                </span>
+              </Badge>
+            )}
+            {meta?.contexts && meta.contexts.length > 0 && (
+              <Badge variant="accent">rag: {meta.contexts.map((c) => c.doc_id).join(", ")}</Badge>
+            )}
+            {stats &&
+              (meta?.lane === "cache" || stats.tokens_out === 0 ? (
+                <Badge variant="info">served from cache - $0</Badge>
+              ) : (
+                <Badge variant="outline">
+                  <span className="font-sans normal-case tracking-normal">
+                    {stats.ttft_ms != null ? `ttft ${Math.round(stats.ttft_ms)}ms - ` : ""}
+                    {stats.tokens_out} tok
+                    {stats.tokens_per_sec ? ` - ${Math.round(stats.tokens_per_sec)} tok/s` : ""}
+                    {` - $${stats.cost_usd.toFixed(6)}`}
+                  </span>
+                </Badge>
+              ))}
+          </div>
+        )}
         <Composer onSend={send} disabled={streaming} />
         <p className="mt-2 text-center text-[11px] text-faint">
-          Hosted demo, $5/month cap - Enter to send, Shift+Enter for a newline
+          Hosted demo - $5/month cap
         </p>
       </div>
     </div>
