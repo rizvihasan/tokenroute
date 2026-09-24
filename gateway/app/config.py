@@ -1,5 +1,7 @@
 from functools import lru_cache
 
+from pydantic import field_validator
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,6 +18,14 @@ class Settings(BaseSettings):
     embed_alias: str = "embed-local"
 
     litellm_base_url: str = "http://localhost:4000"
+
+    @field_validator("litellm_base_url")
+    @classmethod
+    def _with_scheme(cls, v: str) -> str:
+        # Render's fromService host property provides a bare hostname.
+        if v and not v.startswith(("http://", "https://")):
+            return f"https://{v}"
+        return v
     litellm_master_key: str = "sk-tokenroute-dev"
 
     redis_url: str = "redis://localhost:6379/0"
