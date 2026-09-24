@@ -9,7 +9,13 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const upstream = await fetch(`${GATEWAY}/chat`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      // public demo runs under a capped demo tenant key when tenancy is on
+      ...(process.env.GATEWAY_DEMO_KEY
+        ? { authorization: `Bearer ${process.env.GATEWAY_DEMO_KEY}` }
+        : {}),
+    },
     body: JSON.stringify(body),
   });
 
@@ -17,7 +23,13 @@ export async function POST(req: NextRequest) {
     const detail = await upstream.text().catch(() => "gateway error");
     return new Response(JSON.stringify({ error: detail }), {
       status: upstream.status || 502,
-      headers: { "content-type": "application/json" },
+      headers: {
+      "content-type": "application/json",
+      // public demo runs under a capped demo tenant key when tenancy is on
+      ...(process.env.GATEWAY_DEMO_KEY
+        ? { authorization: `Bearer ${process.env.GATEWAY_DEMO_KEY}` }
+        : {}),
+    },
     });
   }
 
