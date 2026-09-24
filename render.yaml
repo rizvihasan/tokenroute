@@ -25,11 +25,8 @@ services:
     envVars:
       - key: RUN_WORKER # demo: worker runs in-process (free tier has no workers)
         value: "1"
-      - key: LITELLM_BASE_URL
-        fromService:
-          name: tokenroute-litellm
-          type: web
-          property: host
+      - key: LITELLM_BASE_URL # public URL: fromService host is internal-only
+        value: "https://tokenroute-litellm.onrender.com" # DNS and breaks chat
       - key: LITELLM_MASTER_KEY
         fromService:
           name: tokenroute-litellm
