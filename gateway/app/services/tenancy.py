@@ -60,6 +60,8 @@ class TenantContext:
 
 def _fernet() -> Fernet:
     key = get_settings().byok_master_key
+    # web consoles can strip trailing base64 padding on paste; restore it
+    key += "=" * (-len(key) % 4)
     if not key:
         raise RuntimeError("BYOK_MASTER_KEY is not configured")
     return Fernet(key.encode() if isinstance(key, str) else key)
