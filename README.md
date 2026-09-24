@@ -120,6 +120,10 @@ cd web && npm install && npm run typecheck && npm run build
 
 ## Deploying the demo ($0)
 
+Live demo: https://tokenroute.vercel.app (gateway https://tokenroute-gateway.onrender.com,
+proxy https://tokenroute-litellm.onrender.com). Free services sleep after 15 min idle,
+so the first message can take ~30-60s.
+
 The compose stack is the real thing; a hosted demo is wired for free tiers:
 
 - **web** -> Vercel (root dir `web/`, one env var: `GATEWAY_INTERNAL_URL`)
@@ -135,8 +139,8 @@ The compose stack is the real thing; a hosted demo is wired for free tiers:
 - `render.yaml` is the blueprint; CI runs in GitHub Actions (`.github/workflows/ci.yml`).
 
 Honest tradeoff: no free tier runs a quantized 8B model, so the deployed demo
-swaps local Ollama for Groq's hosted Llama - the routing, fallback, caching,
-and metrics story is identical, and the local-quantized path stays one
+swaps local Ollama for Groq's hosted gpt-oss models - the routing, fallback,
+caching, and metrics story is identical, and the local-quantized path stays one
 `docker compose up` away. Free Render services sleep after 15 min idle; the
 first request after idle cold-starts (~30-60s).
 
