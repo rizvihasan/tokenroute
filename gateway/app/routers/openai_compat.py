@@ -19,7 +19,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from ..config import get_settings
 from ..models import ChatMessage, ChatRequest
-from ..services import cache, db, guardrails, llm, routing, store, tenancy
+from ..services import cache, db, guardrails, llm, rag, routing, store, tenancy
 
 router = APIRouter()
 
@@ -80,11 +80,7 @@ async def _run_pipeline(req: ChatRequest):
 
     contexts: list[dict] = []
     if req.use_rag and prompt:
-        try:
-            [vec] = await llm.embed([prompt])
-            contexts = await db.search(vec, settings.rag_top_k)
-        except Exception:
-            contexts = []
+        contexts = await rag.retrieve(prompt, settings.rag_top_k)
     ctx_text = "\n\n".join(h["content"] for h in contexts)
     ctx_tokens = sum(len(h["content"].split()) for h in contexts)
 

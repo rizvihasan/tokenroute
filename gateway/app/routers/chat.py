@@ -15,7 +15,7 @@ from fastapi.responses import StreamingResponse
 
 from ..config import get_settings
 from ..models import ChatRequest
-from ..services import cache, db, llm, routing, store, tenancy, tracing
+from ..services import rag, cache, db, llm, routing, store, tenancy, tracing
 
 router = APIRouter()
 
@@ -31,14 +31,9 @@ def _sse(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
-async def _retrieve(prompt: str) -> list[dict]:
+async def _retrieve(prompt: str, keys: dict | None = None) -> list[dict]:
     settings = get_settings()
-    try:
-        [vec] = await llm.embed([prompt], tenant_keys)
-        return await db.search(vec, settings.rag_top_k)
-    except Exception:
-        # retrieval is an enhancement, never a hard dependency of answering
-        return []
+    return await rag.retrieve(prompt, settings.rag_top_k, keys)
 
 
 @router.post("/chat")
@@ -94,7 +89,7 @@ async def chat(req: ChatRequest, request: Request):
         return StreamingResponse(replay(), media_type="text/event-stream")
 
     await store.incr_metric("cache_misses", 1, req.conversation_id)
-    contexts = await _retrieve(prompt) if req.use_rag else []
+    contexts = await _retrieve(prompt, tenant_keys) if req.use_rag else []
     ctx_text = "\n\n".join(h["content"] for h in contexts)
     ctx_tokens = sum(len(h["content"].split()) for h in contexts)
 

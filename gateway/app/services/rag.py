@@ -41,3 +41,16 @@ def chunk_text(text: str, size: int = 800, overlap: int = 120) -> list[str]:
             break
         start = max(end - overlap, start + 1)
     return chunks
+
+
+async def retrieve(prompt: str, top_k: int, keys: dict | None = None) -> list[dict]:
+    """Hybrid retrieval pipeline: embed -> vector+keyword (RRF) -> Jina rerank.
+    Any leg failing degrades to the simpler one; retrieval is an enhancement,
+    never a hard dependency of answering."""
+    from . import db, llm  # local import: keeps chunking importable without DB deps
+    try:
+        [vec] = await llm.embed([prompt], keys)
+        contexts = await db.search_hybrid(vec, prompt, top_k * 2)
+        return await llm.rerank(prompt, contexts, top_k, keys)
+    except Exception:
+        return []

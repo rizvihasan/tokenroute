@@ -83,6 +83,38 @@ async def embed(texts: list[str], keys: dict | None = None) -> list[list[float]]
     return [row["embedding"] for row in sorted(data["data"], key=lambda d: d["index"])]
 
 
+async def rerank(query: str, docs: list[dict], top_k: int, keys: dict | None = None) -> list[dict]:
+    """Jina reranker over retrieved chunks. Returns docs unchanged (sliced)
+    when no Jina key is configured or the rerank call fails - reranking is
+    a precision upgrade, never a hard dependency."""
+    if not docs:
+        return docs
+    s = get_settings()
+    key = (keys or {}).get("jina") or s.jina_api_key
+    if not key:
+        return docs[:top_k]
+    try:
+        async with httpx.AsyncClient(base_url=s.embed_base_url, timeout=60) as client:
+            resp = await client.post(
+                "/rerank",
+                headers={"Authorization": f"Bearer {key}"},
+                json={"model": "jina-reranker-v2-base-multilingual",
+                      "query": query,
+                      "documents": [d["content"] for d in docs],
+                      "top_n": top_k},
+            )
+            resp.raise_for_status()
+            results = resp.json().get("results", [])
+        out = []
+        for r in results:
+            d = dict(docs[r["index"]])
+            d["score"] = float(r.get("relevance_score", d.get("score", 0.0)))
+            out.append(d)
+        return out or docs[:top_k]
+    except Exception:
+        return docs[:top_k]
+
+
 async def _stream_once(
     messages: list[dict], alias: str, keys: dict | None = None,
     tools: list[dict] | None = None, tool_choice=None,
