@@ -1,40 +1,43 @@
+import { cn } from "@/lib/utils";
+
 export interface Message {
   role: "user" | "assistant";
   content: string;
+  error?: boolean;
 }
 
 export function MessageList({ messages, streaming }: { messages: Message[]; streaming: boolean }) {
-  if (messages.length === 0) {
-    return (
-      <div className="rounded-lg border border-dashed border-edge p-8 text-center text-sm text-muted">
-        <p className="mb-2 font-medium text-slate-300">TokenRoute demo chat</p>
-        <p>
-          Answers route between a local quantized model and a cloud fallback, with a
-          semantic cache in front. Every request reports its lane, TTFT, token
-          throughput, and cost above.
-        </p>
-      </div>
-    );
-  }
   return (
-    <div className="flex flex-col gap-3 pb-2">
-      {messages.map((m, i) => (
-        <div
-          key={i}
-          className={
-            m.role === "user"
-              ? "self-end max-w-[80%] rounded-lg bg-accent/10 border border-accent/20 px-3 py-2 text-sm"
-              : "self-start max-w-[80%] rounded-lg bg-panel border border-edge px-3 py-2 text-sm"
-          }
-        >
-          <div className="whitespace-pre-wrap leading-relaxed">
-            {m.content}
-            {streaming && m.role === "assistant" && i === messages.length - 1 && (
-              <span className="inline-block w-2 animate-pulse text-accent">▍</span>
-            )}
+    <div className="mx-auto flex max-w-3xl flex-col gap-4 pb-2">
+      {messages.map((m, i) => {
+        const isUser = m.role === "user";
+        const isLast = i === messages.length - 1;
+        return (
+          <div
+            key={i}
+            className={cn("flex animate-fade-up", isUser ? "justify-end" : "justify-start")}
+          >
+            <div
+              className={cn(
+                "max-w-[85%] rounded-2xl px-4 py-3 text-[15px] leading-relaxed sm:max-w-[75%]",
+                isUser
+                  ? "rounded-br-md border border-accent/25 bg-accent/10 text-slate-100"
+                  : m.error
+                    ? "rounded-bl-md border border-red-400/30 bg-red-400/5 text-red-200"
+                    : "rounded-bl-md border border-edge bg-panel text-slate-200",
+              )}
+            >
+              <div className="whitespace-pre-wrap break-words">
+                {m.content}
+                {streaming && !isUser && isLast && (
+                  <span className="ml-0.5 inline-block h-4 w-[7px] translate-y-[3px] animate-pulse-dot rounded-[2px] bg-accent" />
+                )}
+              </div>
+              {isUser && <div className="sr-only">You said</div>}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

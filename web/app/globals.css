@@ -7,5 +7,39 @@
 }
 
 body {
-  @apply bg-ink text-slate-200 antialiased;
+  @apply bg-ink font-sans text-slate-200 antialiased;
+}
+
+::selection {
+  background: rgb(94 234 212 / 0.25);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #212a3a transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #212a3a;
+  border-radius: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+input[type="checkbox"] {
+  accent-color: #5eead4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

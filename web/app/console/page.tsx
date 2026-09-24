@@ -4,12 +4,14 @@ export const dynamic = "force-dynamic";
 
 export default function ConsolePage() {
   return (
-    <div className="py-6">
-      <h1 className="mb-1 text-lg font-semibold">Analytics</h1>
-      <p className="mb-6 text-sm text-muted">
-        Everything the gateway has done lately: routing decisions, cache hits,
-        latency, throughput, and cost - live.
-      </p>
+    <div className="py-6 sm:py-8">
+      <div className="mb-6">
+        <h1 className="text-xl font-semibold tracking-tight text-slate-100 sm:text-2xl">Analytics</h1>
+        <p className="mt-1 text-sm text-muted">
+          Everything the gateway has done lately: routing decisions, cache hits,
+          latency, throughput, and cost - live.
+        </p>
+      </div>
       <ConsoleDashboard />
     </div>
   );

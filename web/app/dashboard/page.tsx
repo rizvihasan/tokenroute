@@ -1,6 +1,11 @@
-import { auth, signOut } from "@/auth";
+import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { ensureTenant, listKeys, createKey, revokeKey, setProviderKey, getBilling, createCheckout } from "@/lib/provision";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Field, Input, Select } from "@/components/ui/input";
+import { CopyButton } from "@/components/CopyButton";
 
 export const dynamic = "force-dynamic";
 
@@ -60,128 +65,145 @@ export default async function DashboardPage({
     else redirect("/dashboard?billing=error");
   }
 
-  async function signOutAction() {
-    "use server";
-    await signOut({ redirectTo: "/" });
-  }
-
   return (
-    <div className="py-8 flex flex-col gap-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold">API keys</h1>
-          <p className="text-muted text-sm">{session.user.email}</p>
+    <div className="flex flex-col gap-6 py-6 sm:py-8">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold tracking-tight text-slate-100 sm:text-2xl">API keys</h1>
+          <p className="mt-1 truncate text-sm text-muted">{session.user.email}</p>
         </div>
-        <form action={signOutAction}>
-          <button className="text-sm text-muted hover:text-slate-200">Sign out</button>
-        </form>
+        <Badge variant="accent">{billing.plan} plan</Badge>
       </div>
 
       {searchParams.newkey && (
-        <div className="rounded-lg border border-accent/50 bg-panel p-4">
-          <p className="text-sm font-medium mb-1">Key created - copy it now. It is shown once.</p>
-          <code className="block font-mono text-sm break-all text-accent">{searchParams.newkey}</code>
-          <p className="text-xs text-muted mt-2">
-            Use it as a Bearer token: <code>Authorization: Bearer {searchParams.newprefix}...</code>
+        <div className="animate-fade-up rounded-xl border border-accent/40 bg-accent/5 p-4 sm:p-5 shadow-glow">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-semibold text-accent">Key created - copy it now. It is shown once.</p>
+            <CopyButton text={searchParams.newkey} label="Copy key" />
+          </div>
+          <code className="mt-3 block break-all rounded-lg border border-accent/20 bg-ink px-3 py-2.5 font-mono text-sm text-accent">
+            {searchParams.newkey}
+          </code>
+          <p className="mt-2.5 text-xs text-muted">
+            Use it as a Bearer token: <code className="font-mono text-slate-300">Authorization: Bearer {searchParams.newprefix}...</code>
           </p>
         </div>
       )}
 
-      <section className="rounded-lg border border-edge bg-panel">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-muted border-b border-edge">
-              <th className="p-3">Name</th><th className="p-3">Key</th>
-              <th className="p-3">Monthly cap</th><th className="p-3">Scopes</th><th className="p-3">Created</th><th className="p-3" />
-            </tr>
-          </thead>
-          <tbody>
-            {keys.map((k) => (
-              <tr key={k.id} className="border-b border-edge/50">
-                <td className="p-3">{k.name}</td>
-                <td className="p-3 font-mono text-muted">{k.prefix}...</td>
-                <td className="p-3">{k.monthly_cap_usd != null ? `$${k.monthly_cap_usd}` : "none"}</td>
-                <td className="p-3 text-muted">{(k.scopes ?? ["chat"]).join(", ")}</td>
-                <td className="p-3 text-muted">{new Date(k.created_at).toLocaleDateString()}</td>
-                <td className="p-3 text-right">
-                  <form action={revokeKeyAction}>
-                    <input type="hidden" name="key_id" value={k.id} />
-                    <button className="text-xs text-red-400 hover:text-red-300">Revoke</button>
-                  </form>
-                </td>
+      <Card className="overflow-hidden">
+        <CardHeader title="Your keys" description={`${keys.length} active key${keys.length === 1 ? "" : "s"} on this tenant`} />
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] text-sm">
+            <thead>
+              <tr className="border-b border-edge text-left text-xs font-medium uppercase tracking-wider text-faint">
+                <th className="px-5 py-3">Name</th>
+                <th className="px-5 py-3">Key</th>
+                <th className="px-5 py-3">Monthly cap</th>
+                <th className="px-5 py-3">Scopes</th>
+                <th className="px-5 py-3">Created</th>
+                <th className="px-5 py-3" />
               </tr>
-            ))}
-            {keys.length === 0 && (
-              <tr><td colSpan={6} className="p-3 text-muted">No keys yet - create one below.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </section>
+            </thead>
+            <tbody>
+              {keys.map((k) => (
+                <tr key={k.id} className="border-b border-edge/40 transition-colors last:border-0 hover:bg-panel-2/50">
+                  <td className="px-5 py-3 font-medium text-slate-200">{k.name}</td>
+                  <td className="px-5 py-3 font-mono text-xs text-muted">{k.prefix}...</td>
+                  <td className="px-5 py-3 text-muted">{k.monthly_cap_usd != null ? `$${k.monthly_cap_usd}` : "none"}</td>
+                  <td className="px-5 py-3">
+                    <div className="flex gap-1">
+                      {(k.scopes ?? ["chat"]).map((s) => (
+                        <Badge key={s} variant="muted">{s}</Badge>
+                      ))}
+                    </div>
+                  </td>
+                  <td className="px-5 py-3 text-muted">{new Date(k.created_at).toLocaleDateString()}</td>
+                  <td className="px-5 py-3 text-right">
+                    <form action={revokeKeyAction}>
+                      <input type="hidden" name="key_id" value={k.id} />
+                      <Button variant="destructive" size="sm" type="submit">Revoke</Button>
+                    </form>
+                  </td>
+                </tr>
+              ))}
+              {keys.length === 0 && (
+                <tr><td colSpan={6} className="px-5 py-8 text-center text-sm text-muted">No keys yet - create one below.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
 
-      <section className="rounded-lg border border-edge bg-panel p-4">
-        <h2 className="font-medium mb-2">Billing</h2>
-        <p className="text-sm text-muted mb-3">
-          Current plan: <span className="text-slate-200 font-medium">{billing.plan}</span>
-          {billing.status !== "active" ? ` (${billing.status})` : ""} - free tier includes a
-          $5/mo platform cap. Pro raises it to $50/mo.
-        </p>
-        {searchParams.billing === "unconfigured" && (
-          <p className="text-sm text-amber-400 mb-2">Payments are not switched on yet - checkout opens when the provider account is connected.</p>
-        )}
-        {billing.plan === "free" && (
-          <form action={upgradeAction}>
-            <button className="rounded-lg border border-accent px-4 py-1.5 text-sm font-medium text-accent hover:bg-accent/10">Upgrade to Pro</button>
+      <Card>
+        <CardHeader title="New key" description="Keys are shown once at creation; store them somewhere safe." />
+        <CardContent>
+          <form action={createKeyAction} className="flex flex-wrap items-end gap-4">
+            <Field label="Name" className="w-full sm:w-44">
+              <Input name="name" defaultValue="default" />
+            </Field>
+            <Field label="Monthly budget cap (USD, optional)" className="w-full sm:w-48">
+              <Input name="cap" placeholder="5.00" inputMode="decimal" />
+            </Field>
+            <fieldset className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-muted">Scopes</span>
+              <div className="flex items-center gap-4 rounded-lg border border-edge bg-ink px-3 py-2">
+                <label className="flex items-center gap-2 text-sm text-muted">
+                  <input type="checkbox" name="scopes" value="chat" defaultChecked /> chat
+                </label>
+                <label className="flex items-center gap-2 text-sm text-muted">
+                  <input type="checkbox" name="scopes" value="metrics" /> metrics
+                </label>
+              </div>
+            </fieldset>
+            <Button type="submit">Create key</Button>
           </form>
-        )}
-      </section>
+        </CardContent>
+      </Card>
 
-      <section className="rounded-lg border border-edge bg-panel p-4">
-        <h2 className="font-medium mb-3">New key</h2>
-        <form action={createKeyAction} className="flex gap-3 items-end flex-wrap">
-          <label className="text-sm flex flex-col gap-1">
-            <span className="text-muted">Name</span>
-            <input name="name" defaultValue="default" className="rounded bg-canvas border border-edge px-3 py-1.5 text-sm" />
-          </label>
-          <label className="text-sm flex flex-col gap-1">
-            <span className="text-muted">Monthly budget cap (USD, optional)</span>
-            <input name="cap" placeholder="5.00" className="rounded bg-canvas border border-edge px-3 py-1.5 text-sm w-36" />
-          </label>
-          <fieldset className="text-sm flex flex-col gap-1">
-            <span className="text-muted">Scopes</span>
-            <label className="flex items-center gap-2 text-muted">
-              <input type="checkbox" name="scopes" value="chat" defaultChecked /> chat
-            </label>
-            <label className="flex items-center gap-2 text-muted">
-              <input type="checkbox" name="scopes" value="metrics" /> metrics (read usage)
-            </label>
-          </fieldset>
-          <button className="rounded-lg bg-accent px-4 py-1.5 text-sm font-medium text-white">Create key</button>
-        </form>
-      </section>
+      <Card>
+        <CardHeader
+          title="Billing"
+          description="Free tier includes a $5/mo platform cap. Pro raises it to $50/mo."
+        />
+        <CardContent>
+          <p className="text-sm text-muted">
+            Current plan: <span className="font-medium text-slate-200">{billing.plan}</span>
+            {billing.status !== "active" ? ` (${billing.status})` : ""}
+          </p>
+          {searchParams.billing === "unconfigured" && (
+            <p className="mt-2 text-sm text-amber-300">Payments are not switched on yet - checkout opens when the provider account is connected.</p>
+          )}
+          {billing.plan === "free" && (
+            <form action={upgradeAction} className="mt-3">
+              <Button variant="secondary" type="submit" size="sm">Upgrade to Pro</Button>
+            </form>
+          )}
+        </CardContent>
+      </Card>
 
-      <section className="rounded-lg border border-edge bg-panel p-4">
-        <h2 className="font-medium mb-1">Bring your own provider keys (BYOK)</h2>
-        <p className="text-xs text-muted mb-3">
-          Your key calls your provider account directly, so usage bills to your provider, not the platform. Encrypted at rest; your key's budget cap still applies as your own safety limit.
-        </p>
-        <form action={byokAction} className="flex gap-3 items-end flex-wrap">
-          <label className="text-sm flex flex-col gap-1">
-            <span className="text-muted">Provider</span>
-            <select name="provider" className="rounded bg-canvas border border-edge px-3 py-1.5 text-sm">
-              <option value="groq">Groq</option>
-              <option value="openai">OpenAI</option>
-              <option value="gemini">Gemini</option>
-              <option value="jina">Jina (embeddings)</option>
-              <option value="openrouter">OpenRouter</option>
-            </select>
-          </label>
-          <label className="text-sm flex flex-col gap-1 flex-1 min-w-64">
-            <span className="text-muted">API key</span>
-            <input name="api_key" type="password" className="rounded bg-canvas border border-edge px-3 py-1.5 text-sm" />
-          </label>
-          <button className="rounded-lg bg-accent px-4 py-1.5 text-sm font-medium text-white">Save</button>
-        </form>
-      </section>
+      <Card>
+        <CardHeader
+          title="Bring your own provider keys (BYOK)"
+          description="Your key calls your provider account directly, so usage bills to your provider, not the platform. Encrypted at rest; your key's budget cap still applies as your own safety limit."
+        />
+        <CardContent>
+          <form action={byokAction} className="flex flex-wrap items-end gap-4">
+            <Field label="Provider" className="w-full sm:w-52">
+              <Select name="provider">
+                <option value="groq">Groq</option>
+                <option value="openai">OpenAI</option>
+                <option value="gemini">Gemini</option>
+                <option value="jina">Jina (embeddings)</option>
+                <option value="openrouter">OpenRouter</option>
+              </Select>
+            </Field>
+            <Field label="API key" className="min-w-0 flex-1 sm:min-w-64">
+              <Input name="api_key" type="password" autoComplete="off" />
+            </Field>
+            <Button type="submit">Save</Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -3,13 +3,17 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ConsolePayload, EvalResult, RequestEvent } from "@/lib/api";
 import { MetricCard } from "./MetricCard";
+import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardHeader } from "./ui/card";
+import { Skeleton } from "./ui/skeleton";
 
 const POLL_MS = 4000;
 
-const LANE_STYLE: Record<string, { bar: string; badge: string; label: string }> = {
-  local: { bar: "bg-emerald-400", badge: "border-emerald-400/40 text-emerald-300", label: "local" },
-  cloud: { bar: "bg-amber-400", badge: "border-amber-400/40 text-amber-300", label: "cloud" },
-  cache: { bar: "bg-sky-400", badge: "border-sky-400/40 text-sky-300", label: "cache" },
+const LANE_STYLE: Record<string, { bar: string; variant: "success" | "warn" | "info"; label: string }> = {
+  local: { bar: "bg-emerald-400", variant: "success", label: "local" },
+  cloud: { bar: "bg-amber-400", variant: "warn", label: "cloud" },
+  cache: { bar: "bg-sky-400", variant: "info", label: "cache" },
 };
 
 function timeAgo(ts: number): string {
@@ -26,11 +30,7 @@ const fmtCost = (c?: number) => (c === undefined ? "-" : `$${c.toFixed(5)}`);
 
 function laneBadge(lane: string) {
   const st = LANE_STYLE[lane] ?? LANE_STYLE.local;
-  return (
-    <span className={`rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase ${st.badge}`}>
-      {st.label}
-    </span>
-  );
+  return <Badge variant={st.variant}>{st.label}</Badge>;
 }
 
 function LaneSplit({ payload }: { payload: ConsolePayload }) {
@@ -43,29 +43,32 @@ function LaneSplit({ payload }: { payload: ConsolePayload }) {
     { lane: "cache", n: lane_cache },
   ];
   return (
-    <div className="rounded-lg border border-edge bg-panel p-4">
-      <div className="mb-2 text-xs uppercase tracking-wide text-muted">Lane distribution</div>
-      <div className="flex h-3 w-full overflow-hidden rounded-full bg-black/40">
-        {rows.map(({ lane, n }) =>
-          n ? (
-            <div
-              key={lane}
-              className={LANE_STYLE[lane].bar}
-              style={{ width: `${(n / total) * 100}%` }}
-              title={`${lane}: ${n}`}
-            />
-          ) : null,
-        )}
-      </div>
-      <div className="mt-2 flex gap-4 text-xs text-muted">
-        {rows.map(({ lane, n }) => (
-          <span key={lane}>
-            <span className={`mr-1 inline-block h-2 w-2 rounded-full ${LANE_STYLE[lane].bar}`} />
-            {lane} {n} ({Math.round((n / total) * 100)}%)
-          </span>
-        ))}
-      </div>
-    </div>
+    <Card>
+      <CardHeader title="Lane distribution" description="Which lane answered each request" />
+      <CardContent>
+        <div className="flex h-3 w-full overflow-hidden rounded-full bg-ink">
+          {rows.map(({ lane, n }) =>
+            n ? (
+              <div
+                key={lane}
+                className={LANE_STYLE[lane].bar}
+                style={{ width: `${(n / total) * 100}%` }}
+                title={`${lane}: ${n}`}
+              />
+            ) : null,
+          )}
+        </div>
+        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-muted">
+          {rows.map(({ lane, n }) => (
+            <span key={lane} className="inline-flex items-center">
+              <span className={`mr-1.5 inline-block h-2 w-2 rounded-full ${LANE_STYLE[lane].bar}`} />
+              {lane} <span className="ml-1 font-mono text-slate-300">{n}</span>
+              <span className="ml-1 text-faint">({Math.round((n / total) * 100)}%)</span>
+            </span>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -90,62 +93,64 @@ function TtftHistogram({ events }: { events: RequestEvent[] }) {
   );
   const peak = Math.max(...counts, 1);
   return (
-    <div className="rounded-lg border border-edge bg-panel p-4">
-      <div className="mb-2 text-xs uppercase tracking-wide text-muted">
-        Time to first token ({ttfts.length} generations)
-      </div>
-      <div className="flex h-24 items-end gap-1">
-        {counts.map((c, i) => (
-          <div key={i} className="flex flex-1 flex-col items-center gap-1">
-            <div
-              className="w-full rounded-sm bg-emerald-400/70"
-              style={{ height: `${Math.max(2, (c / peak) * 80)}px` }}
-              title={`${BUCKETS[i].label}: ${c}`}
-            />
-            <div className="whitespace-nowrap font-mono text-[9px] text-muted">{BUCKETS[i].label}</div>
-          </div>
-        ))}
-      </div>
-    </div>
+    <Card>
+      <CardHeader title="Time to first token" description={`${ttfts.length} generations in window`} />
+      <CardContent>
+        <div className="flex h-28 items-end gap-1.5">
+          {counts.map((c, i) => (
+            <div key={i} className="flex min-w-0 flex-1 flex-col items-center gap-1.5">
+              <div
+                className="w-full rounded-t-sm bg-emerald-400/70 transition-all"
+                style={{ height: `${Math.max(3, (c / peak) * 88)}px` }}
+                title={`${BUCKETS[i].label}: ${c}`}
+              />
+              <div className="w-full truncate text-center font-mono text-[9px] text-faint">
+                {BUCKETS[i].label}
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
 function RequestFeed({ events }: { events: RequestEvent[] }) {
   if (!events.length) return null;
   return (
-    <div className="overflow-hidden rounded-lg border border-edge bg-panel">
-      <div className="border-b border-edge px-4 py-2 text-xs uppercase tracking-wide text-muted">
-        Live request feed
+    <Card className="overflow-hidden">
+      <CardHeader title="Live request feed" description="Most recent requests across all lanes" />
+      <div className="max-h-[26rem] overflow-auto">
+        <div className="min-w-[640px]">
+          {events.slice(0, 25).map((e, i) => (
+            <div
+              key={`${e.ts}-${i}`}
+              className="flex items-center gap-3 border-b border-edge/40 px-5 py-2.5 font-mono text-xs transition-colors last:border-0 hover:bg-panel-2/50"
+            >
+              <span
+                className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                  e.status === "ok" ? "bg-emerald-400" : "bg-rose-400"
+                }`}
+              />
+              <span className="w-14 shrink-0 text-faint">{timeAgo(e.ts)}</span>
+              <span className="min-w-0 flex-1 truncate text-slate-300" title={e.error ?? e.prompt}>
+                {e.status === "error" ? `error: ${e.error}` : e.prompt || "(no prompt)"}
+              </span>
+              {laneBadge(e.lane)}
+              {e.lane === "cache" && e.similarity !== undefined && (
+                <span className="w-16 text-right text-sky-300">sim {e.similarity.toFixed(2)}</span>
+              )}
+              {e.lane !== "cache" && <span className="w-20 truncate text-right text-muted">{e.model}</span>}
+              <span className="w-16 text-right text-muted">{fmtMs(e.ttft_ms)}</span>
+              <span className="w-14 text-right text-muted">
+                {e.tokens_per_sec ? `${Math.round(e.tokens_per_sec)} t/s` : "-"}
+              </span>
+              <span className="w-16 text-right text-muted">{fmtCost(e.cost_usd)}</span>
+            </div>
+          ))}
+        </div>
       </div>
-      <div className="max-h-96 overflow-y-auto">
-        {events.slice(0, 25).map((e, i) => (
-          <div
-            key={`${e.ts}-${i}`}
-            className="flex items-center gap-3 border-b border-edge/50 px-4 py-2 font-mono text-xs last:border-0"
-          >
-            <span
-              className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                e.status === "ok" ? "bg-emerald-400" : "bg-rose-400"
-              }`}
-            />
-            <span className="w-14 shrink-0 text-muted">{timeAgo(e.ts)}</span>
-            <span className="min-w-0 flex-1 truncate text-slate-300" title={e.error ?? e.prompt}>
-              {e.status === "error" ? `error: ${e.error}` : e.prompt || "(no prompt)"}
-            </span>
-            {laneBadge(e.lane)}
-            {e.lane === "cache" && e.similarity !== undefined && (
-              <span className="w-16 text-right text-sky-300">sim {e.similarity.toFixed(2)}</span>
-            )}
-            {e.lane !== "cache" && <span className="w-16 text-right text-slate-400">{e.model}</span>}
-            <span className="w-16 text-right text-slate-400">{fmtMs(e.ttft_ms)}</span>
-            <span className="w-16 text-right text-slate-400">
-              {e.tokens_per_sec ? `${Math.round(e.tokens_per_sec)} t/s` : "-"}
-            </span>
-            <span className="w-16 text-right text-slate-400">{fmtCost(e.cost_usd)}</span>
-          </div>
-        ))}
-      </div>
-    </div>
+    </Card>
   );
 }
 
@@ -194,20 +199,33 @@ export function ConsoleDashboard() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-2 text-xs text-muted">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
         <span className="relative flex h-2 w-2">
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
           <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
         </span>
-        LIVE - polling the gateway every {POLL_MS / 1000}s
-        {updatedAt && <span>- updated {timeAgo(updatedAt / 1000)}</span>}
-        {s !== undefined && <span>- window: last {s.window} requests</span>}
+        <span className="font-medium uppercase tracking-wider text-emerald-300">Live</span>
+        <span className="text-faint">polling every {POLL_MS / 1000}s</span>
+        {updatedAt && <span className="text-faint">- updated {timeAgo(updatedAt / 1000)}</span>}
+        {s !== undefined && <span className="text-faint">- window: last {s.window} requests</span>}
       </div>
 
-      {s && s.window === 0 && (
-        <div className="rounded-lg border border-edge bg-panel p-6 text-sm text-muted">
-          No requests recorded yet. Send a message in Chat and watch it land here in real time.
+      {!s && (
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-[92px] rounded-xl" />
+          ))}
         </div>
+      )}
+
+      {s && s.window === 0 && (
+        <Card>
+          <CardContent className="py-10 text-center">
+            <p className="text-sm text-muted">
+              No requests recorded yet. Send a message in Chat and watch it land here in real time.
+            </p>
+          </CardContent>
+        </Card>
       )}
 
       {s && s.window > 0 && (
@@ -237,7 +255,7 @@ export function ConsoleDashboard() {
             />
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-2">
             <LaneSplit payload={payload!} />
             <TtftHistogram events={payload!.requests} />
           </div>
@@ -246,28 +264,35 @@ export function ConsoleDashboard() {
         </>
       )}
 
-      <div className="rounded-lg border border-edge bg-panel p-4">
-        <div className="mb-2 text-xs uppercase tracking-wide text-muted">Evaluations (Ragas)</div>
-        {evals?.scores ? (
-          <div className="flex flex-wrap gap-4 font-mono text-sm text-slate-200">
-            <span>lane: {evals.lane}</span>
-            {Object.entries(evals.scores).map(([k, v]) => (
-              <span key={k}>
-                {k}: {typeof v === "number" ? v.toFixed(3) : String(v)}
-              </span>
-            ))}
-          </div>
-        ) : (
-          <div className="text-sm text-muted">No eval results yet.</div>
-        )}
-        <button
-          onClick={runEvals}
-          className="mt-3 rounded-md border border-edge bg-black/30 px-3 py-1.5 text-xs text-slate-200 hover:border-slate-500"
-        >
-          Run evals
-        </button>
-        {evalStatus && <span className="ml-2 text-xs text-muted">{evalStatus}</span>}
-      </div>
+      <Card>
+        <CardHeader
+          title="Evaluations (Ragas)"
+          description="Quality scores for the current lane lineup"
+          action={
+            <div className="flex items-center gap-2">
+              {evalStatus && <span className="text-xs text-muted">{evalStatus}</span>}
+              <Button variant="secondary" size="sm" onClick={runEvals}>
+                Run evals
+              </Button>
+            </div>
+          }
+        />
+        <CardContent>
+          {evals?.scores ? (
+            <div className="flex flex-wrap gap-x-6 gap-y-2 font-mono text-sm text-slate-200">
+              <Badge variant="muted">lane: {evals.lane}</Badge>
+              {Object.entries(evals.scores).map(([k, v]) => (
+                <span key={k} className="inline-flex items-baseline gap-1.5">
+                  <span className="text-xs text-muted">{k}</span>
+                  <span className="text-accent">{typeof v === "number" ? v.toFixed(3) : String(v)}</span>
+                </span>
+              ))}
+            </div>
+          ) : (
+            <div className="text-sm text-muted">No eval results yet.</div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
