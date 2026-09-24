@@ -15,7 +15,7 @@ from fastapi.responses import StreamingResponse
 
 from ..config import get_settings
 from ..models import ChatRequest
-from ..services import cache, db, llm, routing, store, tracing
+from ..services import cache, db, llm, routing, store, tenancy, tracing
 
 router = APIRouter()
 
@@ -34,7 +34,7 @@ def _sse(event: str, data: dict) -> str:
 async def _retrieve(prompt: str) -> list[dict]:
     settings = get_settings()
     try:
-        [vec] = await llm.embed([prompt])
+        [vec] = await llm.embed([prompt], tenant_keys)
         return await db.search(vec, settings.rag_top_k)
     except Exception:
         # retrieval is an enhancement, never a hard dependency of answering
@@ -48,7 +48,20 @@ async def chat(req: ChatRequest, request: Request):
     if not prompt:
         raise HTTPException(status_code=422, detail="no user message supplied")
 
-    client_ip = request.client.host if request.client else "unknown"
+    tenant_keys = None
+    key_id = None
+    if settings.tenancy_enabled:
+        auth = request.headers.get("authorization", "")
+        raw = auth[7:] if auth.lower().startswith("bearer ") else ""
+        ctx = await tenancy.resolve(raw) if raw else None
+        if ctx is None:
+            raise HTTPException(status_code=401, detail="invalid or missing API key")
+        if await tenancy.budget_exceeded(ctx):
+            raise HTTPException(status_code=402, detail="monthly budget cap reached")
+        tenant_keys = ctx.provider_keys
+        key_id = ctx.key_id
+
+    client_ip = key_id or (request.client.host if request.client else "unknown")
     if not await store.check_rate_limit(client_ip):
         raise HTTPException(status_code=429, detail="rate limit exceeded")
 
@@ -105,7 +118,7 @@ async def chat(req: ChatRequest, request: Request):
                 "cached": False, "lane": lane, "model": model_alias, "route_reason": reason,
                 "contexts": [{"doc_id": h["doc_id"], "score": round(h["score"], 4)} for h in contexts],
             })
-            async for event in llm.stream_chat(messages, model_alias):
+            async for event in llm.stream_chat(messages, model_alias, tenant_keys):
                 if "error" in event:
                     await store.log_request({
                         "ts": time.time(), "conversation_id": req.conversation_id,

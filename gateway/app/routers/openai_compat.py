@@ -19,7 +19,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from ..config import get_settings
 from ..models import ChatMessage, ChatRequest
-from ..services import cache, db, llm, routing, store
+from ..services import cache, db, llm, routing, store, tenancy
 
 router = APIRouter()
 
@@ -41,6 +41,25 @@ def _chunk(cid: str, model: str, delta: dict, finish: str | None = None) -> dict
         "model": model,
         "choices": [{"index": 0, "delta": delta, "finish_reason": finish}],
     }
+
+
+async def _authenticate(request: Request):
+    """Tenancy gate. Returns (TenantContext | None, error response | None)."""
+    if not get_settings().tenancy_enabled:
+        return None, None
+    auth = request.headers.get("authorization", "")
+    raw = auth[7:] if auth.lower().startswith("bearer ") else ""
+    if not raw:
+        return None, JSONResponse(status_code=401, content={
+            "error": {"message": "missing API key", "type": "auth_error"}})
+    ctx = await tenancy.resolve(raw)
+    if ctx is None:
+        return None, JSONResponse(status_code=401, content={
+            "error": {"message": "invalid or revoked API key", "type": "auth_error"}})
+    if await tenancy.budget_exceeded(ctx):
+        return None, JSONResponse(status_code=402, content={
+            "error": {"message": "monthly budget cap reached", "type": "budget_exceeded"}})
+    return ctx, None
 
 
 async def _run_pipeline(req: ChatRequest):
@@ -93,7 +112,12 @@ async def chat_completions(payload: dict, request: Request):
     elif model_req == settings.lane_cloud_alias:
         force = "cloud"
 
-    client_ip = request.client.host if request.client else "unknown"
+    ctx, err = await _authenticate(request)
+    if err is not None:
+        return err
+    keys = ctx.provider_keys if ctx else None
+
+    client_ip = ctx.key_id if ctx else (request.client.host if request.client else "unknown")
     if not await store.check_rate_limit(client_ip):
         return JSONResponse(status_code=429, content={"error": {"message": "rate limit exceeded"}})
 
@@ -118,7 +142,7 @@ async def chat_completions(payload: dict, request: Request):
         collected: list[str] = []
         usage: dict = {}
         error: str | None = None
-        async for event in llm.stream_chat(messages, model_alias):
+        async for event in llm.stream_chat(messages, model_alias, keys):
             if "error" in event:
                 error = event["error"]
                 break
@@ -155,6 +179,8 @@ async def chat_completions(payload: dict, request: Request):
             "tokens_in": tokens_in, "tokens_out": tokens_out,
             "tokens_per_sec": 0.0, "cost_usd": round(cost, 6),
         })
+        if ctx is not None:
+            await store.record_spend(ctx.key_id, cost)
         if text:
             try:
                 await cache.save(prompt, text, model_alias)
@@ -175,7 +201,7 @@ async def chat_completions(payload: dict, request: Request):
         })
     collected: list[str] = []
     usage = {}
-    async for event in llm.stream_chat(messages, model_alias):
+    async for event in llm.stream_chat(messages, model_alias, keys):
         if "error" in event:
             return JSONResponse(status_code=502,
                                 content={"error": {"message": event["error"], "type": "upstream_error"}})

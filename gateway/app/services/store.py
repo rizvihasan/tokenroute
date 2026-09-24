@@ -138,3 +138,21 @@ async def check_rate_limit(key: str) -> bool:
     if count == 1:
         await r.expire(bucket, 90)
     return count <= limit
+
+
+def _month_key(key_id: str) -> str:
+    return f"spend:{key_id}:{time.strftime('%Y%m', time.gmtime())}"
+
+
+async def record_spend(key_id: str, cost_usd: float) -> None:
+    """Add to a tenant key's monthly spend (budget enforcement reads this)."""
+    r = get_redis()
+    k = _month_key(key_id)
+    await r.incrbyfloat(k, cost_usd)
+    await r.expire(k, 62 * 24 * 3600)  # two months; only the current one is read
+
+
+async def monthly_spend(key_id: str) -> float:
+    r = get_redis()
+    v = await r.get(_month_key(key_id))
+    return float(v) if v else 0.0

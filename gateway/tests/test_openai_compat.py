@@ -9,7 +9,7 @@ client = TestClient(app)
 
 
 def _patch_pipeline(monkeypatch, events):
-    async def fake_stream(messages, alias):
+    async def fake_stream(messages, alias, keys=None):
         for e in events:
             yield e
 

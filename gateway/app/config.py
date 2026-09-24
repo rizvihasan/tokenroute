@@ -30,8 +30,17 @@ class Settings(BaseSettings):
     # 0 = provider native size; when set it must equal embedding_dim (the
     # pgvector column size). jina-embeddings-v3 native is 1024.
     embed_dimensions: int = 0
+    # provider names used for BYOK lookup (tenant provider_keys table)
+    chat_provider: str = "groq"
+    embed_provider: str = "jina"
     groq_api_key: str = ""
     jina_api_key: str = ""
+
+    # multi-tenancy (open core): off for local dev / the public demo,
+    # on for a hosted deployment
+    tenancy_enabled: bool = False
+    admin_key: str = ""  # protects /admin provisioning endpoints
+    byok_master_key: str = ""  # Fernet key encrypting tenant provider keys
 
     redis_url: str = "redis://localhost:6379/0"
     database_url: str = "postgresql://postgres:postgres@localhost:5432/tokenroute"

@@ -18,17 +18,23 @@ import httpx
 from ..config import get_settings
 
 
-def _chat_provider(alias: str) -> tuple[str, str, str]:
-    """Resolve a lane alias to (base_url, api_key, provider model)."""
+def _chat_provider(alias: str, keys: dict | None = None) -> tuple[str, str, str]:
+    """Resolve a lane alias to (base_url, api_key, provider model).
+
+    keys: a tenant's BYOK provider keys (provider name -> plaintext). A tenant
+    key for the configured chat provider wins over the platform's env key -
+    that is the BYOK path; without one, the platform key serves the request.
+    """
     s = get_settings()
+    tenant_key = (keys or {}).get(s.chat_provider)
     if alias == s.lane_cloud_alias:
-        return (s.chat_cloud_base_url, s.chat_cloud_api_key or s.groq_api_key,
+        return (s.chat_cloud_base_url, tenant_key or s.chat_cloud_api_key or s.groq_api_key,
                 s.chat_cloud_model)
-    return (s.chat_local_base_url, s.chat_local_api_key or s.groq_api_key,
+    return (s.chat_local_base_url, tenant_key or s.chat_local_api_key or s.groq_api_key,
             s.chat_local_model)
 
 
-async def embed(texts: list[str]) -> list[list[float]]:
+async def embed(texts: list[str], keys: dict | None = None) -> list[list[float]]:
     s = get_settings()
     payload: dict = {"model": s.embed_model, "input": texts}
     if s.embed_dimensions:
@@ -36,7 +42,7 @@ async def embed(texts: list[str]) -> list[list[float]]:
     async with httpx.AsyncClient(base_url=s.embed_base_url, timeout=120) as client:
         resp = await client.post(
             "/embeddings",
-            headers={"Authorization": f"Bearer {s.embed_api_key or s.jina_api_key}"},
+            headers={"Authorization": f"Bearer {(keys or {}).get(s.embed_provider) or s.embed_api_key or s.jina_api_key}"},
             json=payload,
         )
         if resp.status_code == 422 and "dimensions" in payload:
@@ -44,7 +50,7 @@ async def embed(texts: list[str]) -> list[list[float]]:
             payload.pop("dimensions")
             resp = await client.post(
                 "/embeddings",
-                headers={"Authorization": f"Bearer {s.embed_api_key or s.jina_api_key}"},
+                headers={"Authorization": f"Bearer {(keys or {}).get(s.embed_provider) or s.embed_api_key or s.jina_api_key}"},
                 json=payload,
             )
         resp.raise_for_status()
@@ -53,11 +59,11 @@ async def embed(texts: list[str]) -> list[list[float]]:
 
 
 async def _stream_once(
-    messages: list[dict], alias: str
+    messages: list[dict], alias: str, keys: dict | None = None
 ) -> AsyncIterator[dict]:
     """Stream one attempt against the alias's provider. Raises httpx.HTTPError
     on transport failure; yields {'error'} on a non-200 before any token."""
-    base, key, model = _chat_provider(alias)
+    base, key, model = _chat_provider(alias, keys)
     payload = {
         "model": model,
         "messages": messages,
@@ -95,7 +101,7 @@ async def _stream_once(
                     yield {"usage": event["usage"]}
 
 
-async def stream_chat(messages: list[dict], model_alias: str) -> AsyncIterator[dict]:
+async def stream_chat(messages: list[dict], model_alias: str, keys: dict | None = None) -> AsyncIterator[dict]:
     """Yield {'token'} / {'usage'} / {'error'} events.
 
     Fallback (previously LiteLLM's router_settings.fallbacks): if the chosen
@@ -114,7 +120,7 @@ async def stream_chat(messages: list[dict], model_alias: str) -> AsyncIterator[d
     for alias in aliases:
         yielded_token = False
         try:
-            async for event in _stream_once(messages, alias):
+            async for event in _stream_once(messages, alias, keys):
                 if "error" in event and not yielded_token:
                     last_error = event["error"]
                     break  # clean pre-token refusal: try the fallback lane
@@ -133,9 +139,9 @@ async def stream_chat(messages: list[dict], model_alias: str) -> AsyncIterator[d
     yield {"error": last_error}
 
 
-async def complete_chat(messages: list[dict], model_alias: str) -> dict:
+async def complete_chat(messages: list[dict], model_alias: str, keys: dict | None = None) -> dict:
     """Non-streaming completion, used by the eval runner."""
-    base, key, model = _chat_provider(model_alias)
+    base, key, model = _chat_provider(model_alias, keys)
     async with httpx.AsyncClient(base_url=base, timeout=180) as client:
         resp = await client.post(
             "/chat/completions",
