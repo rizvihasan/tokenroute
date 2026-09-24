@@ -121,7 +121,7 @@ export default async function DashboardPage({
       <section className="rounded-lg border border-edge bg-panel p-4">
         <h2 className="font-medium mb-1">Bring your own provider keys (BYOK)</h2>
         <p className="text-xs text-muted mb-3">
-          Your key calls your provider account directly - no platform budget cap, encrypted at rest.
+          Your key calls your provider account directly, so usage bills to your provider, not the platform. Encrypted at rest; your key's budget cap still applies as your own safety limit.
         </p>
         <form action={byokAction} className="flex gap-3 items-end flex-wrap">
           <label className="text-sm flex flex-col gap-1">
