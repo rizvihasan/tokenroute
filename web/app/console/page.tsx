@@ -5,9 +5,10 @@ export const dynamic = "force-dynamic";
 export default function ConsolePage() {
   return (
     <div className="py-6">
-      <h1 className="mb-1 text-lg font-semibold">Ops console</h1>
+      <h1 className="mb-1 text-lg font-semibold">Analytics</h1>
       <p className="mb-6 text-sm text-muted">
-        Live view of the inference gateway: latency, throughput, cost, cache, and routing.
+        Everything the gateway has done lately: routing decisions, cache hits,
+        latency, throughput, and cost - live.
       </p>
       <ConsoleDashboard />
     </div>

@@ -18,7 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </Link>
             <nav className="flex gap-5 text-sm text-muted">
               <Link href="/" className="hover:text-slate-200 transition-colors">Chat</Link>
-              <Link href="/console" className="hover:text-slate-200 transition-colors">Ops console</Link>
+              <Link href="/console" className="hover:text-slate-200 transition-colors">Analytics</Link>
             </nav>
           </div>
         </header>

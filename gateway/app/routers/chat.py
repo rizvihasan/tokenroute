@@ -55,11 +55,20 @@ async def chat(req: ChatRequest, request: Request):
     cached = await cache.lookup(prompt) if req.use_cache else None
     if cached is not None:
         async def replay():
+            started = time.perf_counter()
             await store.incr_metric("cache_hits", 1, req.conversation_id)
             yield _sse("meta", {"cached": True, "lane": "cache", "model": cached["model"],
                                 "similarity": round(cached["similarity"], 4)})
             for tok in cached["response"].split(" "):
                 yield _sse("token", {"token": tok + " "})
+            await store.log_request({
+                "ts": time.time(), "conversation_id": req.conversation_id,
+                "prompt": prompt[:120], "lane": "cache", "model": cached["model"],
+                "cached": True, "similarity": round(cached["similarity"], 4),
+                "status": "ok", "ttft_ms": 0.0,
+                "elapsed_s": round(time.perf_counter() - started, 3),
+                "tokens_in": 0, "tokens_out": 0, "tokens_per_sec": 0.0, "cost_usd": 0.0,
+            })
             yield _sse("done", {"cost_usd": 0.0, "tokens_out": 0, "ttft_ms": 0.0})
         return StreamingResponse(replay(), media_type="text/event-stream")
 
@@ -92,6 +101,15 @@ async def chat(req: ChatRequest, request: Request):
             })
             async for event in llm.stream_chat(messages, model_alias):
                 if "error" in event:
+                    await store.log_request({
+                        "ts": time.time(), "conversation_id": req.conversation_id,
+                        "prompt": prompt[:120], "lane": lane, "model": model_alias,
+                        "cached": False, "status": "error",
+                        "error": event["error"][:200],
+                        "elapsed_s": round(time.perf_counter() - started, 3),
+                        "tokens_in": 0, "tokens_out": 0, "tokens_per_sec": 0.0,
+                        "cost_usd": 0.0,
+                    })
                     yield _sse("error", {"message": event["error"]})
                     return
                 if "usage" in event:
@@ -115,6 +133,16 @@ async def chat(req: ChatRequest, request: Request):
             tps = tokens_out / elapsed_s if elapsed_s else 0.0
 
             await store.record_latency("generation", elapsed_s * 1000, req.conversation_id)
+            await store.log_request({
+                "ts": time.time(), "conversation_id": req.conversation_id,
+                "prompt": prompt[:120], "lane": lane, "model": model_alias,
+                "cached": False, "status": "ok",
+                "ttft_ms": round((first_token_at - started) * 1000, 1) if first_token_at else None,
+                "elapsed_s": round(elapsed_s, 2),
+                "tokens_in": tokens_in, "tokens_out": tokens_out,
+                "tokens_per_sec": round(tps, 2), "cost_usd": round(cost, 6),
+                "contexts_used": len(contexts),
+            })
             await store.incr_metric("requests", 1, req.conversation_id)
             await store.incr_metric(f"lane_{lane}", 1, req.conversation_id)
             await store.incr_metric("tokens_in", tokens_in, req.conversation_id)
